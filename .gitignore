@@ -1,0 +1,6 @@
+*.pyc
+.vscode
+*.prof
+*__pycache__*
+export
+ui/examples_pyqtgraph.py
