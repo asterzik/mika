@@ -1,1 +1,2 @@
 To use: Change the path in app.py to the folder with your images.
+So far the image files need to follow the format [index_wavlength]_[index_frame].{png, tiff, jpg, jpeg}
