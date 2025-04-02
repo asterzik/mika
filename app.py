@@ -24,6 +24,7 @@ from ui.extinction_ui import ExtinctionUi
 from ui.time_series_ui import TimeSeries
 from ui.statistics_view import StatisticsView
 from misc.profiling import ProfileContext
+import gc
 
 
 class MainWindow(QMainWindow):
@@ -246,30 +247,43 @@ class MainWindow(QMainWindow):
             self.resetUI()  # Call method to reset the UI
 
     def resetUI(self):
-        """Safely destroy current UI and reinitialize."""
-        # Delete the current UI elements to avoid memory leaks
-        if self.spot_ui:
-            self.spot_ui.cleanup()
-            self.spot_ui = None
+        """Completely destroy current UI and reinitialize from scratch."""
 
-        if self.spot_selection_ui:
-            self.spot_selection_ui.cleanup()
-            self.spot_selection_ui = None
+        # 1. Stop any timers, threads, or background tasks
+        if hasattr(self, "background_thread") and self.background_thread:
+            self.background_thread.terminate()
+            self.background_thread.wait()
+            self.background_thread = None
 
-        if self.extinction_ui:
-            self.extinction_ui.cleanup()
-            self.extinction_ui = None
+        if hasattr(self, "update_timer") and self.update_timer:
+            self.update_timer.stop()
+            self.update_timer = None
 
-        if self.time_series:
-            self.time_series.cleanup()
-            self.time_series = None
+        # 2. Cleanup UI components
+        for attr in ["spot_ui", "spot_selection_ui", "extinction_ui", "time_series"]:
+            ui_element = getattr(self, attr, None)
+            if ui_element:
+                ui_element.cleanup()
+                setattr(self, attr, None)
 
-        # Clear central widget and reinitialize the UI
+        # 3. Remove the central widget
         central_widget = self.centralWidget()
         if central_widget:
             central_widget.deleteLater()
+            self.setCentralWidget(None)  # Ensures full removal
 
-        self.initUI()  # Reinitialize the UI with the new path
+        # 4. Clear all menus and actions
+        menu_bar = self.menuBar()
+        if menu_bar:
+            menu_bar.clear()
+            for action in menu_bar.actions():
+                menu_bar.removeAction(action)
+
+        # 5. Force garbage collection to clean up any lingering objects
+        gc.collect()
+
+        # 6. Reinitialize the UI from scratch
+        self.initUI()
 
 
 if __name__ == "__main__":
