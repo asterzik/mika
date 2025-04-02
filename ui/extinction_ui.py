@@ -218,8 +218,10 @@ class ExtinctionUi:
         self.updateCurvesData()
         self.parent.time_series.updateCurveData()
 
-    def plot(self, time, time_label_index, group_index, spot_label):
-        regressor = self.regressors[time][group_index]
+    def plot(self, time, time_label_index, spot_index, group_index, spot_label):
+        regressor = self.regressors[time][
+            spot_index
+        ]  # spot_index = group_index for average first
         x_values, y_values = regressor.generateValues(self.num_regression_points)
         rgb_color = color_palette[spot_label]
         pen = pg.mkPen(color=QColor(*rgb_color), width=3)
@@ -261,7 +263,7 @@ class ExtinctionUi:
         regressor.fit()
         return regressor.generateValues(self.num_regression_points)
 
-    def plot_average_over_time(self, group_index, spot_label):
+    def plot_average_over_time(self, spot_index, group_index, spot_label):
         # Create and add plot line
         spot_color = color_palette[spot_label]
         pen1 = pg.mkPen(color=QColor(*spot_color), width=3, style=pg.QtCore.Qt.DashLine)
@@ -270,14 +272,14 @@ class ExtinctionUi:
         # Fit and plot for both time ranges
 
         x_plot, y_plot = self.compute_average_over_time(
-            self.time_range1_indices, group_index
+            self.time_range1_indices, spot_index
         )
         line = pg.PlotDataItem(x_plot, y_plot, pen=pen1, symbol=None)
         self.plot_widget.addItem(line)
         self.time_average_curves[0, group_index] = line
 
         x_plot, y_plot = self.compute_average_over_time(
-            self.time_range2_indices, group_index
+            self.time_range2_indices, spot_index
         )
         line = pg.PlotDataItem(x_plot, y_plot, pen=pen2, symbol=None)
         self.plot_widget.addItem(line)
@@ -471,9 +473,11 @@ class ExtinctionUi:
             for i in range(self.num_groups):
                 label = self.group_labels[i]
                 count = 0
-                for labels in self.selected_spot_labels:
+                for labels, index in zip(
+                    self.selected_spot_labels, self.selected_spot_indices
+                ):
                     if label in labels:
-                        self.new_metric[:, i, :] += self.metric[:, i, :]
+                        self.new_metric[:, i, :] += self.metric[:, index, :]
                         count += 1
                 self.new_metric[:, i, :] /= count
             self.metric = self.new_metric
@@ -518,15 +522,20 @@ class ExtinctionUi:
                 self.updateTimeRanges()
                 self.time_average_curves = np.empty((2, self.num_groups), dtype=object)
                 for group_index, group_label in enumerate(self.group_labels):
-                    self.plot_average_over_time(group_index, group_label)
+                    self.plot_average_over_time(group_index, group_index, group_label)
             else:
                 self.updateTimeRanges()
                 self.time_average_curves = np.empty(
                     (2, len(self.selected_spot_indices)), dtype=object
                 )
-                for spot_index in range(len(self.selected_spot_indices)):
-                    spot_label = self.selected_spot_labels[spot_index][0]
-                    self.plot_average_over_time(spot_index, spot_label)
+                for group_index, group_label in enumerate(self.group_labels):
+                    for spot_labels, spot_index in zip(
+                        self.selected_spot_labels, self.selected_spot_indices
+                    ):
+                        if group_label in spot_labels:
+                            self.plot_average_over_time(
+                                spot_index, group_index, group_label
+                            )
         else:
             if self.average_first_radio.isChecked():
                 for time_enum, time in enumerate(self.time_indices):
@@ -534,14 +543,24 @@ class ExtinctionUi:
                     for group_index, group_label in enumerate(self.group_labels):
                         # Plot data points, polynomials, and store wavelength for maximum for every curve
 
-                        self.plot(time, time_enum, group_index, group_label)
+                        self.plot(
+                            time, time_enum, group_index, group_index, group_label
+                        )
             else:
                 for time_enum, time in enumerate(self.time_indices):
-
-                    for spot_index in range(len(self.selected_spot_indices)):
-                        # Plot data points, polynomials, and store wavelength for maximum for every curve
-                        spot_label = self.selected_spot_labels[spot_index][0]
-                        self.plot(time, time_enum, spot_index, spot_label)
+                    for group_index, group_label in enumerate(self.group_labels):
+                        for spot_labels, spot_index in zip(
+                            self.selected_spot_labels, self.selected_spot_indices
+                        ):
+                            if group_label in spot_labels:
+                                # Plot data points, polynomials, and store wavelength for maximum for every curve
+                                self.plot(
+                                    time,
+                                    time_enum,
+                                    spot_index,
+                                    group_index,
+                                    group_label,
+                                )
 
         # Plot Maxima
         self.scatter_maxima = pg.ScatterPlotItem()
