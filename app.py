@@ -156,8 +156,9 @@ class MainWindow(QMainWindow):
             denoising_layout.addWidget(button)
             button.toggled.connect(self.set_denoising_method)
 
-        # Add the denoising group box to the sidebar layout
-        sidebar_layout.addWidget(denoising_group_box)
+        # TODO: Really check out denoising options and make sure they work if they are to be selected in the framework
+        # # Add the denoising group box to the sidebar layout
+        # sidebar_layout.addWidget(denoising_group_box)
 
         sidebar_layout.addLayout(self.extinction_ui.button_layout)
 
