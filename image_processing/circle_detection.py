@@ -206,6 +206,7 @@ class Circles:
         Returns:
         - None
         """
+
         # Load image names from the directory
         self.image_names = [
             f
@@ -226,11 +227,16 @@ class Circles:
                 re.compile(r"imLCTFatWL(\d+)Frame(\d+)"),  # Format 3
             ]
 
-            for pattern in patterns:
+            for i, pattern in enumerate(patterns):
                 match = pattern.search(filename)
                 if match:
                     wl, frame = match.groups()
-                    return int(wl), int(frame)  # Convert to integers
+                    # Check if the files were generated with a LED device and convert LED indices to wavelengths
+                    if i == 0:
+                        mapping = [470, 500, 530, 590, 615, 660]
+                        wl = mapping[int(wl)]
+
+                    return int(wl), int(frame)
 
             raise ValueError(f"Pattern not implemented yet for filename: {filename}")
 
