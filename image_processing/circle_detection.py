@@ -235,6 +235,9 @@ class Circles:
                     if i == 0:
                         mapping = [470, 500, 530, 590, 615, 660]
                         wl = mapping[int(wl)]
+                    if i == 1:
+                        mapping = [470, 500, 530, 560, 590, 615, 660]
+                        wl = mapping[int(wl)]
 
                     return int(wl), int(frame)
 
