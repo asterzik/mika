@@ -1,1 +1,4 @@
-To use: Change the path in app.py to the folder with your images.
+- The wavelengths and frames are extracted from the image names. The pattern matching is done in the function load_images in image_processing/circle_detection.py
+It works for the data I have but might not work for your data. You can adjust it there.
+- If you want, you can set a default_path to an image folder that gets opened automatically upon startup in app.py, but this is not necessary
+- You can use the requirements.txt to install the necessary packages for this project to function (pip install -r requirements.txt)

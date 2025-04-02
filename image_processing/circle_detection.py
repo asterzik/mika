@@ -219,6 +219,7 @@ class Circles:
         self.frames = []
         grouped_images = {}
 
+        # TODO Get the pattern extraction right, when they decided on a format
         def extract_wl_frame(filename):
             filename, _ = filename.split(".")  # Remove file extension
             patterns = [

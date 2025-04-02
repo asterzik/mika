@@ -25,21 +25,16 @@ from ui.time_series_ui import TimeSeries
 from ui.statistics_view import StatisticsView
 from misc.profiling import ProfileContext
 import gc
+import os
+
+default_path = "/media/sd/mika/data/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
 
 
 class MainWindow(QMainWindow):
     def __init__(self, path=None):
         super(MainWindow, self).__init__()
         self.setWindowTitle("MIKA")
-
-        # Save the current path
-        # self.path = path if path else "/home/asterzik/projects/mika/data/cropped"
-        self.path = (
-            path
-            if path
-            else "/media/sd/mika/data/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
-            # else "/media/sd/mika/data/Calibration_water_5xSSC_6LEDs/Images"
-        )
+        self.showMaximized()
 
         # Initialize variables for UI components (to be deleted later)
         self.spot_ui = None
@@ -47,7 +42,16 @@ class MainWindow(QMainWindow):
         self.extinction_ui = None
         self.time_series = None
 
-        self.initUI()
+        # Add file selection
+        self.open_action = QAction("&Open", self)
+        self.open_action.triggered.connect(self.openFolder)
+        menu = self.menuBar()
+        file_menu = menu.addMenu("&File")
+        file_menu.addAction(self.open_action)
+
+        self.path = path if path else default_path
+        if os.path.exists(self.path):
+            self.initUI()
 
     def initUI(self):
         """Initialize the UI elements."""
@@ -176,11 +180,6 @@ class MainWindow(QMainWindow):
         export_layout.addWidget(export_timeseries_button)
         sidebar_layout.addWidget(export_group_box)
 
-        # Open Action
-        self.open_action = QAction("&Open", self)
-        self.open_action.triggered.connect(self.openFolder)
-        self.createMenu()
-
     def analysis_layer_button_clicked(self):
         # with ProfileContext("start_analysis.prof"):
         if self.spot_ui.circles.selected_spots == []:
@@ -233,13 +232,6 @@ class MainWindow(QMainWindow):
         # Pass on the key press event to the spot_ui
         self.spot_ui.keyPressEvent(event)
 
-    def createMenu(self):
-        menu = self.menuBar()
-        file_menu = menu.addMenu("&File")
-
-        # Add Open action to the File menu
-        file_menu.addAction(self.open_action)
-
     def openFolder(self):
         file_dialog = QFileDialog(self)
         file_dialog.setFileMode(QFileDialog.Directory)
@@ -272,13 +264,6 @@ class MainWindow(QMainWindow):
         if central_widget:
             central_widget.deleteLater()
             self.setCentralWidget(None)  # Ensures full removal
-
-        # 4. Clear all menus and actions
-        menu_bar = self.menuBar()
-        if menu_bar:
-            menu_bar.clear()
-            for action in menu_bar.actions():
-                menu_bar.removeAction(action)
 
         # 5. Force garbage collection to clean up any lingering objects
         gc.collect()
