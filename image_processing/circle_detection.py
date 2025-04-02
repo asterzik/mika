@@ -10,6 +10,7 @@ from statsmodels.robust.scale import huber
 import cProfile
 import pstats
 from image_processing.hyspectral_images import denoise_hsi_images
+import re
 
 
 # TODO make that changeable in the GUI
@@ -217,10 +218,27 @@ class Circles:
         self.frames = []
         grouped_images = {}
 
+        def extract_wl_frame(filename):
+            filename, _ = filename.split(".")  # Remove file extension
+            patterns = [
+                re.compile(r"(\d+)_(\d+)"),  # Format 1
+                re.compile(r"imageAtLED(\d+)Frame(\d+)"),  # Format 2
+                re.compile(r"imLCTFatWL(\d+)Frame(\d+)"),  # Format 3
+            ]
+
+            for pattern in patterns:
+                match = pattern.search(filename)
+                if match:
+                    wl, frame = match.groups()
+                    return int(wl), int(frame)  # Convert to integers
+
+            raise ValueError(f"Pattern not implemented yet for filename: {filename}")
+
         # Group images by frame
         for image_name in self.image_names:
-            i_name, _ = image_name.split(".")  # Remove file extension
-            w, f = i_name.split("_")  # Split into wavelength and frame
+            w, f = extract_wl_frame(
+                image_name
+            )  # Extract wavelength and frame using regex
             wavelength = int(w)
             frame = int(f)
 
