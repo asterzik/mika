@@ -178,6 +178,10 @@ class No_Reg(Regressor):
         self.x = x[sorted_indices]
         self.y = y[sorted_indices]
 
+    def cleanup(self):
+        self.x = None
+        self.y = None
+
     def fit(self):
         pass
 
@@ -207,37 +211,45 @@ class No_Reg(Regressor):
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Warning)
         msg.setWindowTitle("Not Implemented")
-        msg.setText("Bounded centroids not implemented for No Regression.")
+        msg.setText(
+            "Bounded centroids not implemented for No Regression. Using full centroid."
+        )
         msg.setStandardButtons(QMessageBox.Ok)
         msg.exec_()
-        raise NotImplementedError("Bounded centroid not implemented for No_Reg")
+        return self.full_centroid()
 
     def centroid_left_bound(self):
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Warning)
         msg.setWindowTitle("Not Implemented")
-        msg.setText("Bounded centroids are not implemented for No Regression.")
+        msg.setText(
+            "Bounded centroids not implemented for No Regression. Using full centroid."
+        )
         msg.setStandardButtons(QMessageBox.Ok)
         msg.exec_()
-        raise NotImplementedError("Bounded centroid not implemented for No_Reg")
+        return self.full_centroid()
 
     def left_bound_half_height_centroid(self):
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Warning)
         msg.setWindowTitle("Not Implemented")
-        msg.setText("Bounded centroids are not implemented for No Regression.")
+        msg.setText(
+            "Bounded centroids not implemented for No Regression. Using full centroid."
+        )
         msg.setStandardButtons(QMessageBox.Ok)
         msg.exec_()
-        raise NotImplementedError("Bounded centroid not implemented for No_Reg")
+        return self.full_centroid()
 
     def inflection(self):
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Warning)
         msg.setWindowTitle("Not Implemented")
-        msg.setText("Inflection not implemented for No Regression.")
+        msg.setText(
+            "Inflection not implemented for No Regression. Using full centroid."
+        )
         msg.setStandardButtons(QMessageBox.Ok)
         msg.exec_()
-        raise NotImplementedError("Inflection not implemented for No_Reg")
+        return self.full_centroid()
 
     def bounded_cross_correlation(self, reference):
         raise NotImplementedError(
