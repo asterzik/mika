@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QCheckBox,
     QFileDialog,
+    QMessageBox,
 )
 from PySide6.QtGui import QColor
 import pyqtgraph as pg
@@ -226,6 +227,7 @@ class ExtinctionUi:
 
         self.max_radio.toggled[bool].connect(self.updateMetric)
         self.centroid_radio.toggled[bool].connect(self.updateMetric)
+
         self.centroid_left_bound_radio.toggled[bool].connect(self.updateMetric)
         self.centroid_half_height_radio.toggled[bool].connect(self.updateMetric)
         self.centroid_left_bound_half_height_radio.toggled[bool].connect(
@@ -441,6 +443,15 @@ class ExtinctionUi:
         )
 
     def updateMetric(self, checked=True, first=False):
+        if self.no_reg_radio.isChecked():
+            if not (self.max_radio.isChecked() or self.centroid_radio.isChecked()):
+                QMessageBox.warning(
+                    self.parent,
+                    "Not Implemented",
+                    "This metric is not implemented for No Regression. Using Centroid instead.",
+                )
+                self.centroid_radio.setChecked(True)
+
         if not checked:
             return
         if self.max_radio.isChecked():

@@ -10,7 +10,6 @@ from sklearn.gaussian_process.kernels import (
     WhiteKernel,
     ConstantKernel as C,
 )
-from PySide6.QtWidgets import QMessageBox
 
 warnings.filterwarnings(
     "ignore", category=UserWarning, module="sklearn.gaussian_process.kernels"
@@ -208,48 +207,16 @@ class No_Reg(Regressor):
         return centroid, 0
 
     def bounded_centroid(self, bound):
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Warning)
-        msg.setWindowTitle("Not Implemented")
-        msg.setText(
-            "Bounded centroids not implemented for No Regression. Using full centroid."
-        )
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.exec_()
-        return self.full_centroid()
+        raise NotImplementedError("Bounded centroid not implemented for No_Reg")
 
     def centroid_left_bound(self):
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Warning)
-        msg.setWindowTitle("Not Implemented")
-        msg.setText(
-            "Bounded centroids not implemented for No Regression. Using full centroid."
-        )
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.exec_()
-        return self.full_centroid()
+        raise NotImplementedError("Bounded centroid not implemented for No_Reg")
 
     def left_bound_half_height_centroid(self):
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Warning)
-        msg.setWindowTitle("Not Implemented")
-        msg.setText(
-            "Bounded centroids not implemented for No Regression. Using full centroid."
-        )
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.exec_()
-        return self.full_centroid()
+        raise NotImplementedError("Bounded centroid not implemented for No_Reg")
 
     def inflection(self):
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Warning)
-        msg.setWindowTitle("Not Implemented")
-        msg.setText(
-            "Inflection not implemented for No Regression. Using full centroid."
-        )
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.exec_()
-        return self.full_centroid()
+        raise NotImplementedError("Inflection not implemented for No_Reg")
 
     def bounded_cross_correlation(self, reference):
         raise NotImplementedError(
