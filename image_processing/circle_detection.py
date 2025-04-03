@@ -51,7 +51,7 @@ def calculate_mean_intensity(image, mask, denoising_method):
 
 def compute_fore_back_ground_per_image(
     image,
-    detected_circles,
+    selected_circles,
     denoising_method,
     b_radius_inner,
     b_radius_outer,
@@ -60,7 +60,7 @@ def compute_fore_back_ground_per_image(
 ):
     average_foreground = []
     average_background = []
-    for pt in detected_circles:
+    for pt in selected_circles:
         a, b, r = pt[0], pt[1], pt[2]
         a += int(round(shift[0]))
         b += int(round(shift[1]))
@@ -583,7 +583,9 @@ class Circles:
             self.detected = True
 
         n_images = len(self.images)
-        n_circles = np.shape(self.detected_circles)[1]
+        n_circles = len(self.selected_spots)
+        spots = self.detected_circles[0, self.selected_spots]
+
         self.foreground = np.zeros((n_images, n_circles))
         self.background = np.zeros((n_images, n_circles))
 
@@ -592,7 +594,7 @@ class Circles:
         mp_inputs = [
             (
                 image,
-                self.detected_circles[0],
+                spots,
                 self.parent.parent.mean_method,
                 self.parent.background_inner_radius_param.value(),
                 self.parent.background_outer_radius_param.value(),

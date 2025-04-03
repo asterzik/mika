@@ -62,7 +62,6 @@ class ExtinctionUi:
         self.group_averaging_options()
         self.plot_widget.setBackground("w")
         self.plot_widget.setTitle("Extinction", color="black")
-        self.spot_indices = None
         self.spot_labels = None
         self.time_indices = None
         self.time_labels = None
@@ -109,7 +108,6 @@ class ExtinctionUi:
         self.parent = None
 
         # Set other attributes to None (if necessary)
-        self.spot_indices = None
         self.spot_labels = None
         self.time_indices = None
         self.time_labels = None
@@ -301,14 +299,14 @@ class ExtinctionUi:
         )
         line = pg.PlotDataItem(x_plot, y_plot, pen=pen1, symbol=None)
         self.plot_widget.addItem(line)
-        self.time_average_curves[0, group_index] = line
+        self.time_average_curves[0, spot_index] = line
 
         x_plot, y_plot = self.compute_average_over_time(
             self.time_range2_indices, spot_index
         )
         line = pg.PlotDataItem(x_plot, y_plot, pen=pen2, symbol=None)
         self.plot_widget.addItem(line)
-        self.time_average_curves[1, group_index] = line
+        self.time_average_curves[1, spot_index] = line
 
     def updateAverageOverTime(self, group_index):
         x, y = self.compute_average_over_time(self.time_range1_indices, group_index)
@@ -328,16 +326,11 @@ class ExtinctionUi:
     def setAllIndices(self):
         self.time_indices = np.array(range(self.num_time_steps))
         self.time_labels = np.zeros_like((self.time_indices))
-        self.spot_indices = np.array(range(self.extinction[0].shape[1]))
-        self.spot_labels = np.zeros_like(self.spot_indices)
+        self.spot_labels = np.zeros(self.extinction[0].shape[1])
 
     def computeExtinction(self):
 
-        if (
-            not self.parent.spot_ui.circles.extinction_bool
-            and self.parent.spot_ui.circles.detected
-        ):
-            self.parent.spot_ui.circles.compute_extinction()
+        self.parent.spot_ui.circles.compute_extinction()
         if self.parent.spot_ui.circles.extinction_bool:
             frames, x_axis_values, extinction_values = (
                 self.parent.spot_ui.circles.get_extinction()
@@ -351,9 +344,6 @@ class ExtinctionUi:
 
             self.num_time_steps = len(np.unique(frames))
             self.wavelengths = len(frames) // self.num_time_steps
-            self.selected_spot_indices = (
-                self.parent.spot_ui.circles.getSelectedSpotIndices()
-            )
             self.selected_spot_labels = (
                 self.parent.spot_ui.circles.getSelectedSpotLabels()
             )
@@ -373,7 +363,6 @@ class ExtinctionUi:
         self.num_groups = len(self.group_labels)
 
     def averageGroups(self):
-        spot_indices = self.selected_spot_indices
         spot_labels = self.selected_spot_labels
 
         # Initialize arrays to store the sum and count of extinction values for each group
@@ -386,9 +375,7 @@ class ExtinctionUi:
         for i, labels in enumerate(spot_labels):
             for label in labels:
                 group_index = np.where(self.group_labels == label)[0][0]
-                sum_extinction_per_group[:, :, group_index] += self.extinction[
-                    :, :, spot_indices[i]
-                ]
+                sum_extinction_per_group[:, :, group_index] += self.extinction[:, :, i]
                 count_per_group[group_index] += 1
 
         # Compute the average extinction for each group
@@ -505,9 +492,7 @@ class ExtinctionUi:
             for i in range(self.num_groups):
                 label = self.group_labels[i]
                 count = 0
-                for labels, index in zip(
-                    self.selected_spot_labels, self.selected_spot_indices
-                ):
+                for index, labels in enumerate(self.selected_spot_labels):
                     if label in labels:
                         self.new_metric[:, i, :] += self.metric[:, index, :]
                         count += 1
@@ -529,19 +514,18 @@ class ExtinctionUi:
             curve.setVisible(False)
         for time in self.time_indices:
 
-            for spot_index in self.spot_indices:
-                i = time * self.num_spots + spot_index
+            for spot_index in range(self.spot_labels.shape[0]):
                 self.curves[time][spot_index].setVisible(True)
         self.updateDataPoints()
 
     def updateDataPoints(self):
         x_vals = self.wavelengths[self.time_indices[:, None], :]
-        x_vals = np.tile(x_vals, (1, 1, len(self.spot_indices)))
+        x_vals = np.tile(x_vals, (1, 1, self.num_spots))
         x_vals = x_vals.flatten()
 
         # Select extinction values for the given time indices and spot indices
         y_vals = self.extinction[
-            self.time_indices[:, None], :, self.spot_indices
+            self.time_indices[:, None], :, :
         ]  # shape (len(time_indices), num_wavelengths, len(spot_indices))
         y_vals = y_vals.flatten()  # Flatten to get shape (num_values, )
         self.scatter_data_points.setData(x=x_vals, y=y_vals)
@@ -557,13 +541,9 @@ class ExtinctionUi:
                     self.plot_average_over_time(group_index, group_index, group_label)
             else:
                 self.updateTimeRanges()
-                self.time_average_curves = np.empty(
-                    (2, len(self.selected_spot_indices)), dtype=object
-                )
+                self.time_average_curves = np.empty((2, self.num_spots), dtype=object)
                 for group_index, group_label in enumerate(self.group_labels):
-                    for spot_labels, spot_index in zip(
-                        self.selected_spot_labels, self.selected_spot_indices
-                    ):
+                    for spot_index, spot_labels in enumerate(self.selected_spot_labels):
                         if group_label in spot_labels:
                             self.plot_average_over_time(
                                 spot_index, group_index, group_label
@@ -581,8 +561,8 @@ class ExtinctionUi:
             else:
                 for time_enum, time in enumerate(self.time_indices):
                     for group_index, group_label in enumerate(self.group_labels):
-                        for spot_labels, spot_index in zip(
-                            self.selected_spot_labels, self.selected_spot_indices
+                        for spot_index, spot_labels in enumerate(
+                            self.selected_spot_labels
                         ):
                             if group_label in spot_labels:
                                 # Plot data points, polynomials, and store wavelength for maximum for every curve
@@ -650,7 +630,7 @@ class ExtinctionUi:
                         # Plot data points, polynomials, and store wavelength for maximum for every curve
                         self.updateCurveData(time, group_index)
         else:
-            for spot_index in range(len(self.selected_spot_indices)):
+            for spot_index in range(self.num_spots):
                 if self.average_time_checkbox.isChecked():
                     self.updateAverageOverTime(spot_index)
                 else:
