@@ -10,6 +10,7 @@ from sklearn.gaussian_process.kernels import (
     WhiteKernel,
     ConstantKernel as C,
 )
+from PySide6.QtWidgets import QMessageBox
 
 warnings.filterwarnings(
     "ignore", category=UserWarning, module="sklearn.gaussian_process.kernels"
@@ -164,6 +165,87 @@ class GPRegression(Regressor):
 
     def second_derivative(self, x):
         return derivative(self.predict, x, dx=1e-6, n=2)
+
+
+class No_Reg(Regressor):
+    def __init__(self, x, y):
+        # Get the sorted indices based on self.x
+        x = np.array(x)
+        y = np.array(y)
+        sorted_indices = np.argsort(x)
+
+        # Sort both arrays using the sorted indices
+        self.x = x[sorted_indices]
+        self.y = y[sorted_indices]
+
+    def fit(self):
+        pass
+
+    def predict(self, x):
+        pass
+
+    def second_derivative(self, x):
+        pass
+
+    def generateValues(self, num_values):
+        return self.x, self.y
+
+    def generateBoundedValues(self, num_values, a, b):
+        pass
+
+    def max(self):
+        return self.x[np.argmax(self.y)], np.max(self.y)
+
+    def centroid(self, a, b):
+        raise NotImplementedError("Bounded centroid not implemented for No_Reg")
+
+    def full_centroid(self):
+        centroid = np.sum(self.x * self.y) / np.sum(self.y)
+        return centroid, 0
+
+    def bounded_centroid(self, bound):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle("Not Implemented")
+        msg.setText("Bounded centroids not implemented for No Regression.")
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.exec_()
+        raise NotImplementedError("Bounded centroid not implemented for No_Reg")
+
+    def centroid_left_bound(self):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle("Not Implemented")
+        msg.setText("Bounded centroids are not implemented for No Regression.")
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.exec_()
+        raise NotImplementedError("Bounded centroid not implemented for No_Reg")
+
+    def left_bound_half_height_centroid(self):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle("Not Implemented")
+        msg.setText("Bounded centroids are not implemented for No Regression.")
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.exec_()
+        raise NotImplementedError("Bounded centroid not implemented for No_Reg")
+
+    def inflection(self):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle("Not Implemented")
+        msg.setText("Inflection not implemented for No Regression.")
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.exec_()
+        raise NotImplementedError("Inflection not implemented for No_Reg")
+
+    def bounded_cross_correlation(self, reference):
+        raise NotImplementedError(
+            "Bounded cross correlation not implemented for No_Reg"
+        )
+
+    def cross_correlation(self, reference):
+        raise NotImplementedError("Cross correlation not implemented for No_Reg")
 
 
 class Polynomial(Regressor):

@@ -16,20 +16,32 @@ import os
 
 from enum import Enum
 
-from line_fitting.line_fitting import Polynomial, GPRegression
+from line_fitting.line_fitting import No_Reg, Polynomial, GPRegression
 from misc.colors import color_palette
 from misc.profiling import ProfileContext
 import multiprocessing as mp
 
+from enum import Enum
 
-def individualRegression(f, i, wavelengths, extinction, gp_bool, poly_degree):
+
+class RegressorType(Enum):
+    NO_REG = "No regression"
+    POLY = "Polynomial"
+    GP = "GP"
+
+
+def individualRegression(f, i, wavelengths, extinction, regressor_type, poly_degree):
     x = wavelengths[f]
     y = extinction[f, :, i]
 
-    if gp_bool:
+    if regressor_type == RegressorType.NO_REG:
+        regressor = No_Reg(x, y)
+    elif regressor_type == RegressorType.GP:
         regressor = GPRegression(x, y)
-    else:
+    elif regressor_type == RegressorType.POLY:
         regressor = Polynomial(x, y, poly_degree)
+    else:
+        raise ValueError(f"Unknown regressor type: {regressor_type}")
 
     regressor.fit()
 
@@ -160,11 +172,20 @@ class ExtinctionUi:
         group_box = QGroupBox("Select Regressor")
         group_layout = QVBoxLayout()
 
-        self.poly_radio = QRadioButton("Polynomial")
-        self.gp_radio = QRadioButton("GP")
+        self.no_reg_radio = QRadioButton(RegressorType.NO_REG.value)
+        self.poly_radio = QRadioButton(RegressorType.POLY.value)
+        self.gp_radio = QRadioButton(RegressorType.GP.value)
 
-        self.poly_radio.setChecked(True)
+        self.no_reg_radio.setChecked(True)  # Default selection
 
+        # Store mapping of radio buttons to enums
+        self.regressor_map = {
+            self.no_reg_radio: RegressorType.NO_REG,
+            self.poly_radio: RegressorType.POLY,
+            self.gp_radio: RegressorType.GP,
+        }
+
+        group_layout.addWidget(self.no_reg_radio)
         group_layout.addWidget(self.poly_radio)
         group_layout.addWidget(self.gp_radio)
 
@@ -172,7 +193,9 @@ class ExtinctionUi:
 
         self.button_layout.addWidget(group_box)
 
-        self.poly_radio.toggled.connect(self.updateRegressor)
+        # Connect all buttons to the update function
+        for btn in self.regressor_map:
+            btn.clicked.connect(self.updateRegressor)
 
     def metric_selection_ui(self):
         group_box = QGroupBox("Select Metric")
@@ -188,7 +211,7 @@ class ExtinctionUi:
         self.inflection_radio = QRadioButton("Inflection")
         # self.cross_correlation_radio = QRadioButton("Cross correlation")
 
-        self.max_radio.setChecked(True)
+        self.centroid_radio.setChecked(True)
         # self.cross_correlation_radio.setChecked(True)
 
         group_layout.addWidget(self.max_radio)
@@ -254,10 +277,12 @@ class ExtinctionUi:
         y_mean = np.mean(sorted_extinction, axis=0)
 
         # Select regressor based on user choice
-        if self.gp_radio.isChecked():
-            regressor = GPRegression(x_mean, y_mean)
-        else:
+        if self.no_reg_radio.isChecked():
+            regressor = No_Reg(x_mean, y_mean)
+        elif self.poly_radio.isChecked():
             regressor = Polynomial(x_mean, y_mean, self.poly_degree)
+        elif self.gp_radio.isChecked():
+            regressor = GPRegression(x_mean, y_mean)
 
         # Fit regressor and generate plot data
         regressor.fit()
@@ -370,6 +395,13 @@ class ExtinctionUi:
         self.average_extinction = sum_extinction_per_group / count_per_group
 
     def regression(self, first=True):
+        if self.no_reg_radio.isChecked():
+            selected_regressor = RegressorType.NO_REG
+        elif self.poly_radio.isChecked():
+            selected_regressor = RegressorType.POLY
+        elif self.gp_radio.isChecked():
+            selected_regressor = RegressorType.GP
+
         pool = mp.Pool(mp.cpu_count())
 
         if self.average_later_radio.isChecked():
@@ -379,7 +411,7 @@ class ExtinctionUi:
                     spot,
                     self.wavelengths,
                     self.extinction,
-                    self.gp_radio.isChecked(),
+                    selected_regressor,
                     self.poly_degree,
                 )
                 for frame in range(self.num_time_steps)
@@ -398,7 +430,7 @@ class ExtinctionUi:
                     group,
                     self.wavelengths,
                     self.average_extinction,
-                    self.gp_radio.isChecked(),
+                    selected_regressor,
                     self.poly_degree,
                 )
                 for frame in range(self.num_time_steps)
