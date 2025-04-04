@@ -68,13 +68,13 @@ def compute_fore_back_ground_per_image(
         # Calculate mean background intensity
         grayscale_image = image[:, :, 0]
         mask = np.zeros_like(grayscale_image, dtype=np.uint8)
-        cv2.circle(mask, (a, b), int(r * b_radius_outer), 255, -1)
-        cv2.circle(mask, (a, b), int(r * b_radius_inner), 0, -1)
+        cv2.circle(mask, (a, b), int(b_radius_outer), 255, -1)
+        cv2.circle(mask, (a, b), int(b_radius_inner), 0, -1)
         background = calculate_mean_intensity(grayscale_image, mask, denoising_method)
         average_background.append(background)
         # Calculate mean circle intensity
         circle_mask = np.zeros_like(grayscale_image, dtype=np.uint8)
-        cv2.circle(circle_mask, (a, b), int(r * f_radius), 255, -1)
+        cv2.circle(circle_mask, (a, b), int(f_radius), 255, -1)
         foreground = calculate_mean_intensity(
             grayscale_image, circle_mask, denoising_method
         )

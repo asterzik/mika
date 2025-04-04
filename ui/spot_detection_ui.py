@@ -421,22 +421,20 @@ class SpotDetectionUi:
     def extinction_boundary_buttons(self):
         # Sets the multipliers for the radii of the extinction calculations
         self.inner_radius_label = QLabel("Foreground Radius")
-        self.inner_radius_label.setToolTip(
-            "Set the multiplier for the foreground radius"
-        )
+        self.inner_radius_label.setToolTip("Set the foreground radius in px.")
         self.inner_radius_param = QDoubleSpinBox()
         color = time_color_palette[0]
         self.inner_radius_param.setStyleSheet(
             f"background-color: rgba({color[0]}, {color[1]}, {color[2]}, 20);"
         )
         self.inner_radius_param.valueChanged.connect(self.extinction_values_changed)
-        self.inner_radius_param.setValue(0.5)
-        self.inner_radius_param.setSingleStep(0.05)
-        self.inner_radius_param.setRange(0, 1)
+        self.inner_radius_param.setValue(5)
+        self.inner_radius_param.setSingleStep(1)
+        # self.inner_radius_param.setRange(0, 1)
 
         self.background_inner_radius_label = QLabel("Background Inner Radius")
         self.background_inner_radius_label.setToolTip(
-            "Set the multiplier for the inner radius of the background computation"
+            "Set the inner radius of the background computation in px."
         )
         self.background_inner_radius_param = QDoubleSpinBox()
         color = time_color_palette[1]
@@ -446,13 +444,13 @@ class SpotDetectionUi:
         self.background_inner_radius_param.valueChanged.connect(
             self.extinction_values_changed
         )
-        self.background_inner_radius_param.setValue(1.25)
-        self.background_inner_radius_param.setSingleStep(0.05)
-        self.background_inner_radius_param.setRange(1, 1.5)
+        self.background_inner_radius_param.setValue(10)
+        self.background_inner_radius_param.setSingleStep(1)
+        # self.background_inner_radius_param.setRange(1, 1.5)
 
         self.background_outer_radius_label = QLabel("Background Outer Radius")
         self.background_outer_radius_label.setToolTip(
-            "Set the multiplier for the outer radius of the background computation"
+            "Set the outer radius of the background computation in px."
         )
         self.background_outer_radius_param = QDoubleSpinBox()
         color = time_color_palette[1]
@@ -462,9 +460,9 @@ class SpotDetectionUi:
         self.background_outer_radius_param.valueChanged.connect(
             self.extinction_values_changed
         )
-        self.background_outer_radius_param.setValue(1.5)
-        self.background_outer_radius_param.setSingleStep(0.05)
-        self.background_outer_radius_param.setRange(1.5, 2)
+        self.background_outer_radius_param.setValue(20)
+        self.background_outer_radius_param.setSingleStep(1)
+        # self.background_outer_radius_param.setRange(1.5, 2)
 
         self.update_button = QPushButton("Update")
         self.update_button.clicked.connect(self.circles.compute_extinction)
