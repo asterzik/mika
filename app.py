@@ -120,7 +120,7 @@ class MainWindow(QMainWindow):
             "Median": QRadioButton("Median", self),
             "Mode": QRadioButton("Mode", self),
             "Trimmed Mean": QRadioButton("Trimmed Mean", self),
-            "Huber Mean": QRadioButton("Huber Mean", self),
+            # "Huber Mean": QRadioButton("Huber Mean", self),
         }
 
         # Set the default checked button
