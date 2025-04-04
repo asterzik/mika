@@ -27,7 +27,9 @@ from misc.profiling import ProfileContext
 import gc
 import os
 
-default_path = "/media/sd/mika/data/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
+default_path = (
+    "/media/sd/mika/data/LED/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
+)
 
 
 class MainWindow(QMainWindow):

@@ -8,6 +8,8 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
     QMessageBox,
+    QLabel,
+    QSpinBox,
 )
 from PySide6.QtGui import QColor
 import pyqtgraph as pg
@@ -66,7 +68,6 @@ class ExtinctionUi:
         self.spot_labels = None
         self.time_indices = None
         self.time_labels = None
-        self.poly_degree = 5
         self.regressors = None
         self.num_time_steps = None
         self.num_spots = None
@@ -112,7 +113,6 @@ class ExtinctionUi:
         self.spot_labels = None
         self.time_indices = None
         self.time_labels = None
-        self.poly_degree = None
 
     def computeEverything(self):
         self.computeExtinction()
@@ -184,8 +184,19 @@ class ExtinctionUi:
             self.gp_radio: RegressorType.GP,
         }
 
+        # Add spin box for polynomial degree
+        self.poly_degree_spin = QSpinBox()
+        self.poly_degree_spin.setValue(5)
+        self.poly_degree_spin.setEnabled(False)  # Only enable when poly is selected
+        self.poly_degree_spin.setToolTip("Set polynomial degree")
+
+        self.poly_degree_spin.valueChanged.connect(self.updateRegressor)
+
         group_layout.addWidget(self.no_reg_radio)
-        group_layout.addWidget(self.poly_radio)
+        poly_layout = QHBoxLayout()
+        poly_layout.addWidget(self.poly_radio)
+        poly_layout.addWidget(self.poly_degree_spin)
+        group_layout.addLayout(poly_layout)
         group_layout.addWidget(self.gp_radio)
 
         group_box.setLayout(group_layout)
@@ -237,6 +248,10 @@ class ExtinctionUi:
         # self.cross_correlation_radio.toggled[bool].connect(self.updateMetric)
 
     def updateRegressor(self):
+        if self.poly_radio.isChecked():
+            self.poly_degree_spin.setEnabled(True)
+        else:
+            self.poly_degree_spin.setEnabled(False)
         self.regression(first=False)
         self.updateCurvesData()
         self.parent.time_series.updateCurveData()
@@ -280,7 +295,7 @@ class ExtinctionUi:
         if self.no_reg_radio.isChecked():
             regressor = No_Reg(x_mean, y_mean)
         elif self.poly_radio.isChecked():
-            regressor = Polynomial(x_mean, y_mean, self.poly_degree)
+            regressor = Polynomial(x_mean, y_mean, self.poly_degree_spin.value())
         elif self.gp_radio.isChecked():
             regressor = GPRegression(x_mean, y_mean)
 
@@ -401,7 +416,7 @@ class ExtinctionUi:
                     self.wavelengths,
                     self.extinction,
                     selected_regressor,
-                    self.poly_degree,
+                    self.poly_degree_spin.value(),
                 )
                 for frame in range(self.num_time_steps)
                 for spot in range(self.num_spots)
@@ -420,7 +435,7 @@ class ExtinctionUi:
                     self.wavelengths,
                     self.average_extinction,
                     selected_regressor,
-                    self.poly_degree,
+                    self.poly_degree_spin.value(),
                 )
                 for frame in range(self.num_time_steps)
                 for group in range(self.num_groups)
