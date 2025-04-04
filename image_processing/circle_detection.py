@@ -147,6 +147,9 @@ class Circles:
         # Store detected circles
         if detected_circles is not None:
             self.detected_circles = np.uint16(np.around(detected_circles))
+            return True
+        else:
+            return False
 
     def update_parameters(self, dp, min_dist, param1, param2, min_radius, max_radius):
         """
@@ -410,8 +413,7 @@ class Circles:
                          each circle is defined by its center and radius (x,y,r).
         """
         if not self.detected:
-            self.compute_circles()
-            self.detected = True
+            self.detected = self.compute_circles()
         return self.detected_circles
 
     def draw_circles(self):
@@ -422,16 +424,16 @@ class Circles:
         """
         # Compute circles if not already detected
         if not self.detected:
-            self.compute_circles()
-            self.detected = True
+            self.detected = self.compute_circles()
 
         # Iterate over detected circles and draw them on the image
         self.parent.interactive_image.displayRepresentativeImage()
-        for pt in self.detected_circles[0, :]:
-            self.parent.interactive_image.highlight_circle_by_coordinates(
-                pt[0], pt[1], pt[2]
-            )
-        self.extinction_bool = False
+        if self.detected:
+            for pt in self.detected_circles[0, :]:
+                self.parent.interactive_image.highlight_circle_by_coordinates(
+                    pt[0], pt[1], pt[2]
+                )
+            self.extinction_bool = False
 
         return self.parent.interactive_image.pixmap_item.pixmap()
 
@@ -579,8 +581,7 @@ class Circles:
 
         # Compute circles if not already detected
         if not self.detected:
-            self.compute_circles()
-            self.detected = True
+            self.detected = self.compute_circles()
 
         n_images = len(self.images)
         n_circles = len(self.selected_spots)
