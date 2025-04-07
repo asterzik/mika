@@ -204,7 +204,7 @@ class ExtinctionUi:
         self.poly_degree_spin.setEnabled(False)  # Only enable when poly is selected
         self.poly_degree_spin.setStyleSheet("QSpinBox { color: gray; }")
 
-        self.poly_degree_spin.setToolTip("Set polynomial degree")
+        self.poly_degree_spin.setToolTip("Set polynomial degree.")
 
         self.poly_degree_spin.valueChanged.connect(self.updateRegressor)
 

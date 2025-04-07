@@ -105,20 +105,23 @@ class MainWindow(QMainWindow):
         self.pipeline_stack_layout.addWidget(self.results_view.widget)
 
         # Add pipeline buttons
-        spot_detection_layer_button = QPushButton("Spot Detection", self)
-        spot_detection_layer_button.clicked.connect(
-            lambda: self.pipeline_stack_layout.setCurrentIndex(0)
+        self.spot_detection_layer_button = QPushButton("Spot Detection", self)
+        self.spot_detection_layer_button.clicked.connect(
+            self.spot_detection_layer_button_clicked
         )
 
-        analysis_layer_button = QPushButton("Analysis", self)
-        analysis_layer_button.clicked.connect(self.analysis_layer_button_clicked)
+        self.analysis_layer_button = QPushButton("Analysis", self)
+        self.analysis_layer_button.clicked.connect(self.analysis_layer_button_clicked)
 
-        self.results_layer_button = QPushButton("Results", self)
+        self.results_layer_button = QPushButton("Binding score", self)
         self.results_layer_button.setEnabled(False)
+        self.results_layer_button.setStyleSheet(
+            "background-color: #d3d3d3; color: #888888;"
+        )
         self.results_layer_button.clicked.connect(self.results_layer_button_clicked)
 
-        pipeline_button_layout.addWidget(spot_detection_layer_button)
-        pipeline_button_layout.addWidget(analysis_layer_button)
+        pipeline_button_layout.addWidget(self.spot_detection_layer_button)
+        pipeline_button_layout.addWidget(self.analysis_layer_button)
         pipeline_button_layout.addWidget(self.results_layer_button)
         # Denoising buttons
         mean_layout = QFormLayout()
@@ -191,6 +194,9 @@ class MainWindow(QMainWindow):
         export_layout.addWidget(export_timeseries_button)
         sidebar_layout.addWidget(export_group_box)
 
+    def spot_detection_layer_button_clicked(self):
+        self.pipeline_stack_layout.setCurrentIndex(0)
+
     def analysis_layer_button_clicked(self):
         # with ProfileContext("start_analysis.prof"):
         if self.spot_ui.circles.selected_spots == []:
@@ -206,6 +212,7 @@ class MainWindow(QMainWindow):
             self.spot_selection_changed = False
         self.pipeline_stack_layout.setCurrentIndex(1)
         self.results_layer_button.setEnabled(True)
+        self.results_layer_button.setStyleSheet("")
 
     def results_layer_button_clicked(self):
         detected_spots = self.spot_ui.circles.detected_circles
