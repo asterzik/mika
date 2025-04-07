@@ -188,6 +188,8 @@ class ExtinctionUi:
         self.poly_degree_spin = QSpinBox()
         self.poly_degree_spin.setValue(5)
         self.poly_degree_spin.setEnabled(False)  # Only enable when poly is selected
+        self.poly_degree_spin.setStyleSheet("QSpinBox { color: gray; }")
+
         self.poly_degree_spin.setToolTip("Set polynomial degree")
 
         self.poly_degree_spin.valueChanged.connect(self.updateRegressor)
@@ -250,8 +252,10 @@ class ExtinctionUi:
     def updateRegressor(self):
         if self.poly_radio.isChecked():
             self.poly_degree_spin.setEnabled(True)
+            self.poly_degree_spin.setStyleSheet("")
         else:
             self.poly_degree_spin.setEnabled(False)
+            self.poly_degree_spin.setStyleSheet("QSpinBox { color: gray; }")
         self.regression(first=False)
         self.updateCurvesData()
         self.parent.time_series.updateCurveData()
