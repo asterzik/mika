@@ -208,6 +208,12 @@ class MainWindow(QMainWindow):
         self.results_layer_button.setEnabled(True)
 
     def results_layer_button_clicked(self):
+        detected_spots = self.spot_ui.circles.detected_circles
+        selected_spots = self.spot_ui.circles.selected_spots
+        spots = detected_spots[0, selected_spots]
+        binding_probability = self.extinction_ui.get_binding_probability()
+        self.results_view.setData(spots, binding_probability)
+        self.results_view.draw()
         self.pipeline_stack_layout.setCurrentIndex(2)
 
     def set_mean_method(self):

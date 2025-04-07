@@ -69,14 +69,14 @@ class StatisticsView(QWidget):
         mean_label = QLabel(f"{mean[0]:.3f}±{std[0]:.3f}")
         mean_range1_label = QLabel(f"{mean[1]:.3f}±{std[1]:.3f}")
         mean_range2_label = QLabel(f"{mean[2]:.3f}±{std[2]:.3f}")
-        diff = mean[2] - mean[1]
-        diff_std = sqrt(std[1] * std[1] + std[2] * std[2])
-        diff_label = QLabel(f"<b>Diff R2 - R1:</b> {diff:.3f}±{diff_std:.3f}")
+        self.diff = mean[2] - mean[1]
+        self.diff_std = sqrt(std[1] * std[1] + std[2] * std[2])
+        diff_label = QLabel(f"<b>Diff R2 - R1:</b> {self.diff:.3f}±{self.diff_std:.3f}")
 
         # Check if the difference is larger than 3 times the standard deviation
         check_label = QLabel()
         check_label.setText("✔️")  # Unicode checkmark
-        if abs(diff) < 3 * diff_std:
+        if abs(self.diff) < 3 * self.diff_std:
             check_label.setVisible(False)
 
         # Store references to the QLabel widgets
@@ -125,12 +125,15 @@ class StatisticsView(QWidget):
             # labels["mean_label"].setText(f"{mean[0]:.3f}±{std[0]:.3f}")
             labels["mean_range1_label"].setText(f"{mean[1]:.3f}±{std[1]:.3f}")
             labels["mean_range2_label"].setText(f"{mean[2]:.3f}±{std[2]:.3f}")
-            diff = mean[2] - mean[1]
-            diff_std = sqrt(std[1] * std[1] + std[2] * std[2])
+            self.diff = mean[2] - mean[1]
+            self.diff_std = sqrt(std[1] * std[1] + std[2] * std[2])
             labels["diff_label"].setText(
-                f"<b>Diff R2 - R1:</b> {diff:.3f}±{diff_std:.3f}"
+                f"<b>Diff R2 - R1:</b> {self.diff:.3f}±{self.diff_std:.3f}"
             )
-            if abs(diff) > 3 * diff_std:
+            if abs(self.diff) > 3 * self.diff_std:
                 labels["check_label"].setVisible(True)
             else:
                 labels["check_label"].setVisible(False)
+
+    def getData(self):
+        return self.diff, self.diff_std
