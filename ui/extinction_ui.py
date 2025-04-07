@@ -128,6 +128,7 @@ class ExtinctionUi:
         self.time_labels = None
 
     def computeEverything(self):
+        self.individual_metric = None
         self.computeExtinction()
         self.setAllIndices()
         if self.curves is None:
