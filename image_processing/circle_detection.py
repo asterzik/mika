@@ -521,6 +521,7 @@ class Circles:
                 self.selected_spot = self.detected_circles[0, min_index, :]
                 self.selected_spots.append(min_index)
                 self.selected_spot_labels.append(group)
+        self.parent.parent.spot_selection_changed = True
 
     def select_spots(self, rect, group=0):
         circles = self.detected_circles[0]
@@ -571,11 +572,13 @@ class Circles:
             self.selected_spot_labels.extend(
                 [[group] for group in group_labels.tolist()]
             )
+        self.parent.parent.spot_selection_changed = True
 
     def deselect_spots(self):
         self.selected_spots = []
         self.selected_spot_labels = []
         self.draw_circles()
+        self.parent.parent.spot_selection_changed = True
 
     def compute_extinction(self):
 
@@ -640,6 +643,7 @@ class Circles:
         for i in range(number_spots):
             self.selected_spot = self.detected_circles[0, i]
             image.highlight_circle(self.selected_spot, [group])
+        self.parent.parent.spot_selection_changed = True
 
     def highlight_selected(self, image, shift=None):
         # self.parent.interactive_image.displayAverageImage()

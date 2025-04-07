@@ -23,6 +23,7 @@ from ui.spot_selection_ui import SpotSelectionUi
 from ui.extinction_ui import ExtinctionUi
 from ui.time_series_ui import TimeSeries
 from ui.statistics_view import StatisticsView
+from ui.results_view import ResultsView
 from misc.profiling import ProfileContext
 import gc
 import os
@@ -81,6 +82,8 @@ class MainWindow(QMainWindow):
         # Simulated statistics data (you would replace this with actual calculations)
         self.statistics_view = StatisticsView(self)
 
+        self.results_view = ResultsView(self)
+
         # Create an analysis widget layout
         self.analysis_widget = QWidget(self)
         self.analysis_layout = QHBoxLayout(self.analysis_widget)
@@ -99,6 +102,7 @@ class MainWindow(QMainWindow):
 
         self.pipeline_stack_layout.addWidget(self.spot_ui.widget)
         self.pipeline_stack_layout.addWidget(self.analysis_widget)
+        self.pipeline_stack_layout.addWidget(self.results_view.widget)
 
         # Add pipeline buttons
         spot_detection_layer_button = QPushButton("Spot Detection", self)
@@ -109,8 +113,13 @@ class MainWindow(QMainWindow):
         analysis_layer_button = QPushButton("Analysis", self)
         analysis_layer_button.clicked.connect(self.analysis_layer_button_clicked)
 
+        self.results_layer_button = QPushButton("Results", self)
+        self.results_layer_button.setEnabled(False)
+        self.results_layer_button.clicked.connect(self.results_layer_button_clicked)
+
         pipeline_button_layout.addWidget(spot_detection_layer_button)
         pipeline_button_layout.addWidget(analysis_layer_button)
+        pipeline_button_layout.addWidget(self.results_layer_button)
         # Denoising buttons
         mean_layout = QFormLayout()
         mean_group_box = QGroupBox("Mean computation", self)
@@ -186,14 +195,20 @@ class MainWindow(QMainWindow):
         # with ProfileContext("start_analysis.prof"):
         if self.spot_ui.circles.selected_spots == []:
             self.spot_ui.circles.select_all_spots(self.spot_ui.interactive_image)
+        if self.spot_selection_changed:
+            self.extinction_ui.computeEverything()
+            self.time_series.draw()
+            self.extinction_ui.draw()
+            means, stds = self.extinction_ui.get_statistics()
+            group_labels = self.extinction_ui.get_groups()
+            self.statistics_view.init_groups(means, stds, group_labels)
+            self.spot_selection_ui.update_image()
+            self.spot_selection_changed = False
         self.pipeline_stack_layout.setCurrentIndex(1)
-        self.extinction_ui.computeEverything()
-        self.time_series.draw()
-        self.extinction_ui.draw()
-        means, stds = self.extinction_ui.get_statistics()
-        group_labels = self.extinction_ui.get_groups()
-        self.statistics_view.init_groups(means, stds, group_labels)
-        self.spot_selection_ui.update_image()
+        self.results_layer_button.setEnabled(True)
+
+    def results_layer_button_clicked(self):
+        self.pipeline_stack_layout.setCurrentIndex(2)
 
     def set_mean_method(self):
         # Update the denoising method based on the checked button
