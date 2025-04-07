@@ -133,7 +133,7 @@ class ExtinctionUi:
         self.generate_group_lists()
         if self.average_first_radio.isChecked():
             self.averageGroups()
-        self.regression()
+        self.regression(self.average_first_radio.isChecked())
 
     def extinction_display_options(self):
         group_box = QGroupBox("Extinction Display")
@@ -174,7 +174,7 @@ class ExtinctionUi:
     def updateAverageGroups(self):
         if self.average_first_radio.isChecked():
             self.averageGroups()
-        self.regression(first=False)
+        self.regression(self.average_first_radio.isChecked(), first=False)
         self.draw()
         self.parent.time_series.updateCurveData()
 
@@ -249,15 +249,26 @@ class ExtinctionUi:
 
         self.button_layout.addWidget(group_box)
 
-        self.max_radio.toggled[bool].connect(self.updateMetric)
-        self.centroid_radio.toggled[bool].connect(self.updateMetric)
-
-        self.centroid_left_bound_radio.toggled[bool].connect(self.updateMetric)
-        self.centroid_half_height_radio.toggled[bool].connect(self.updateMetric)
-        self.centroid_left_bound_half_height_radio.toggled[bool].connect(
-            self.updateMetric
+        average_first = self.average_first_radio.isChecked()
+        self.max_radio.toggled[bool].connect(
+            lambda checked: self.updateMetric(average_first, checked, False)
         )
-        self.inflection_radio.toggled[bool].connect(self.updateMetric)
+        self.centroid_radio.toggled[bool].connect(
+            lambda checked: self.updateMetric(average_first, checked, False)
+        )
+
+        self.centroid_left_bound_radio.toggled[bool].connect(
+            lambda checked: self.updateMetric(average_first, checked, False)
+        )
+        self.centroid_half_height_radio.toggled[bool].connect(
+            lambda checked: self.updateMetric(average_first, checked, False)
+        )
+        self.centroid_left_bound_half_height_radio.toggled[bool].connect(
+            lambda checked: self.updateMetric(average_first, checked, False)
+        )
+        self.inflection_radio.toggled[bool].connect(
+            lambda checked: self.updateMetric(average_first, checked, False)
+        )
         # self.cross_correlation_radio.toggled[bool].connect(self.updateMetric)
 
     def updateRegressor(self):
@@ -267,7 +278,7 @@ class ExtinctionUi:
         else:
             self.poly_degree_spin.setEnabled(False)
             self.poly_degree_spin.setStyleSheet("QSpinBox { color: gray; }")
-        self.regression(first=False)
+        self.regression(self.average_first_radio.isChecked(), first=False)
         self.updateCurvesData()
         self.parent.time_series.updateCurveData()
 
@@ -419,7 +430,12 @@ class ExtinctionUi:
         # Compute the average extinction for each group
         self.average_extinction = sum_extinction_per_group / count_per_group
 
-    def regression(self, first=True):
+    def regression(self, average_first, first=True):
+
+        # Select the appropriate extinction data and regressor storage
+        extinction_data = self.average_extinction if average_first else self.extinction
+        regressor_storage = "averaged_regressors" if average_first else "regressors"
+
         if self.no_reg_radio.isChecked():
             selected_regressor = RegressorType.NO_REG
         elif self.poly_radio.isChecked():
@@ -429,59 +445,42 @@ class ExtinctionUi:
 
         pool = mp.Pool(mp.cpu_count())
 
-        if self.average_first_radio.isChecked():
-            mp_inputs = [
-                (
-                    frame,
-                    group,
-                    self.wavelengths,
-                    self.average_extinction,
-                    selected_regressor,
-                    self.poly_degree_spin.value(),
-                )
-                for frame in range(self.num_time_steps)
-                for group in range(self.num_groups)
-            ]
-            results = pool.starmap(individualRegression, mp_inputs)
-            pool.close()
-            pool.join()
-            self.averaged_regressors = np.array(results).reshape(
-                (self.num_time_steps, self.num_groups)
+        mp_inputs = [
+            (
+                frame,
+                index,
+                self.wavelengths,
+                extinction_data,
+                selected_regressor,
+                self.poly_degree_spin.value(),
             )
-        else:
-            mp_inputs = [
+            for frame in range(self.num_time_steps)
+            for index in range(self.num_groups if average_first else self.num_spots)
+        ]
+        results = pool.starmap(individualRegression, mp_inputs)
+        pool.close()
+        pool.join()
+
+        setattr(
+            self,
+            regressor_storage,
+            np.array(results).reshape(
                 (
-                    frame,
-                    spot,
-                    self.wavelengths,
-                    self.extinction,
-                    selected_regressor,
-                    self.poly_degree_spin.value(),
+                    self.num_time_steps,
+                    self.num_groups if average_first else self.num_spots,
                 )
-                for frame in range(self.num_time_steps)
-                for spot in range(self.num_spots)
-            ]
-            results = pool.starmap(individualRegression, mp_inputs)
-            pool.close()
-            pool.join()
-            self.regressors = np.array(results).reshape(
-                (self.num_time_steps, self.num_spots)
-            )
+            ),
+        )
 
-        self.updateMetric(checked=True, first=first)
+        self.updateMetric(average_first, checked=True, first=first)
 
-        if self.average_first_radio.isChecked():
-            metric_x = self.averaged_metric[:, :, 0]
-        else:
-            metric_x = self.metric[:, :, 0]
-
+        metric = self.averaged_metric if average_first else self.metric
         self.time_series_x = np.arange(self.num_time_steps)
-
-        self.time_series_y = np.array(metric_x).reshape(
+        self.time_series_y = np.array(metric[:, :, 0]).reshape(
             self.num_time_steps, self.num_groups
         )
 
-    def updateMetric(self, checked=True, first=False):
+    def updateMetric(self, average_first, checked=True, first=False):
         if self.no_reg_radio.isChecked():
             if not (self.max_radio.isChecked() or self.centroid_radio.isChecked()):
                 QMessageBox.warning(
@@ -493,98 +492,44 @@ class ExtinctionUi:
 
         if not checked:
             return
-        if self.average_first_radio.isChecked():
-            if self.max_radio.isChecked():
-                self.averaged_metric = np.array(
-                    [
-                        regressor.max()
-                        for regressor in self.averaged_regressors.flatten()
-                    ]
-                )
-            if self.centroid_radio.isChecked():
-                self.averaged_metric = np.array(
-                    [
-                        regressor.full_centroid()
-                        for regressor in self.averaged_regressors.flatten()
-                    ]
-                )
-            if self.centroid_left_bound_radio.isChecked():
-                self.averaged_metric = np.array(
-                    [
-                        regressor.centroid_left_bound()
-                        for regressor in self.averaged_regressors.flatten()
-                    ]
-                )
-            if self.centroid_half_height_radio.isChecked():
-                self.averaged_metric = np.array(
-                    [
-                        regressor.half_height_centroid()
-                        for regressor in self.averaged_regressors.flatten()
-                    ]
-                )
-            if self.centroid_left_bound_half_height_radio.isChecked():
-                self.averaged_metric = np.array(
-                    [
-                        regressor.left_bound_half_height_centroid()
-                        for regressor in self.averaged_regressors.flatten()
-                    ]
-                )
-            if self.inflection_radio.isChecked():
-                self.averaged_metric = np.array(
-                    [
-                        regressor.inflection()
-                        for regressor in self.averaged_regressors.flatten()
-                    ]
-                )
-            self.averaged_metric = self.averaged_metric.reshape(
-                (self.num_time_steps, self.num_groups, 2)
-            )
+
+        regressors = self.averaged_regressors if average_first else self.regressors
+        metric_storage = "averaged_metric" if average_first else "metric"
+
+        if self.max_radio.isChecked():
+            metric = [regressor.max() for regressor in regressors.flatten()]
+        elif self.centroid_radio.isChecked():
+            metric = [regressor.full_centroid() for regressor in regressors.flatten()]
+        elif self.centroid_left_bound_radio.isChecked():
+            metric = [
+                regressor.centroid_left_bound() for regressor in regressors.flatten()
+            ]
+        elif self.centroid_half_height_radio.isChecked():
+            metric = [
+                regressor.half_height_centroid() for regressor in regressors.flatten()
+            ]
+        elif self.centroid_left_bound_half_height_radio.isChecked():
+            metric = [
+                regressor.left_bound_half_height_centroid()
+                for regressor in regressors.flatten()
+            ]
+        elif self.inflection_radio.isChecked():
+            metric = [regressor.inflection() for regressor in regressors.flatten()]
         else:
-            if self.max_radio.isChecked():
-                self.metric = np.array(
-                    [regressor.max() for regressor in self.regressors.flatten()]
-                )
-            if self.centroid_radio.isChecked():
-                self.metric = np.array(
-                    [
-                        regressor.full_centroid()
-                        for regressor in self.regressors.flatten()
-                    ]
-                )
-            if self.centroid_left_bound_radio.isChecked():
-                self.metric = np.array(
-                    [
-                        regressor.centroid_left_bound()
-                        for regressor in self.regressors.flatten()
-                    ]
-                )
-            if self.centroid_half_height_radio.isChecked():
-                self.metric = np.array(
-                    [
-                        regressor.half_height_centroid()
-                        for regressor in self.regressors.flatten()
-                    ]
-                )
-            if self.centroid_left_bound_half_height_radio.isChecked():
-                self.metric = np.array(
-                    [
-                        regressor.left_bound_half_height_centroid()
-                        for regressor in self.regressors.flatten()
-                    ]
-                )
-            if self.inflection_radio.isChecked():
-                self.metric = np.array(
-                    [regressor.inflection() for regressor in self.regressors.flatten()]
-                )
-            # if self.cross_correlation_radio.isChecked():
-            #     self.metric = np.array(
-            #         [
-            #             regressor.bounded_cross_correlation(self.regressors.flatten()[0])
-            #             for regressor in self.regressors.flatten()
-            #         ]
-            #     )
-            # Compute metric to display
-            self.metric = self.metric.reshape((self.num_time_steps, self.num_spots, 2))
+            metric = []
+
+        metric = np.array(metric).reshape(
+            (
+                self.num_time_steps,
+                self.num_groups if average_first else self.num_spots,
+                2,
+            )
+        )
+
+        setattr(self, metric_storage, metric)
+
+        if not average_first:
+            # Aggregate metrics for groups
             self.new_metric = np.zeros((self.num_time_steps, self.num_groups, 2))
             for i in range(self.num_groups):
                 label = self.group_labels[i]
@@ -594,19 +539,15 @@ class ExtinctionUi:
                         self.new_metric[:, i, :] += self.metric[:, index, :]
                         count += 1
                 self.new_metric[:, i, :] /= count
+            self.individual_metric = self.metric
             self.metric = self.new_metric
 
         if not first:
             self.updateMaxima()
-            if self.average_first_radio.isChecked():
-                self.time_series_y = np.array(self.averaged_metric[:, :, 0]).reshape(
-                    self.num_time_steps, self.num_groups
-                )
-            else:
-                self.time_series_y = np.array(self.metric[:, :, 0]).reshape(
-                    self.num_time_steps, self.num_groups
-                )
-            # TODO check whether first or later is important for the next to lines
+            metric = self.averaged_metric if average_first else self.metric
+            self.time_series_y = np.array(metric[:, :, 0]).reshape(
+                self.num_time_steps, self.num_groups
+            )
             self.parent.time_series.updateCurveData()
             self.parent.statistics_view.updateMeans()
 
