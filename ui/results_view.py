@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush
 from misc.graphics_view import CustomGraphicsView
+import matplotlib.cm as cm
 
 
 class ResultsView:
@@ -23,8 +24,8 @@ class ResultsView:
         self.graphics_scene = QGraphicsScene(self.graphics_view)
         self.graphics_view.setScene(self.graphics_scene)
 
-        # Extract the pixmap from the interactive image
-        self.pixmap = self.parent.spot_ui.interactive_image.pixmap_item.pixmap()
+        # get representative image
+        self.pixmap = self.parent.spot_ui.circles.get_representative_image()
 
         # Create a QGraphicsPixmapItem and set the pixmap
         self.pixmap_item = QGraphicsPixmapItem(self.pixmap)
@@ -37,28 +38,32 @@ class ResultsView:
         # Add the CustomGraphicsView to the layout
         self.layout.addWidget(self.graphics_view)
 
-    def setData(self, spots, labels, label_list, diff, std):
+    def setData(self, spots, binding_probability):
         self.spots = spots
-        self.labels = labels
-        self.label_list = label_list
-        self.diff = diff
-        self.std = std
+        self.binding_probability = binding_probability
 
     def draw(self):
-        # Ensure the pixmap is up-to-date
-        self.pixmap = self.parent.spot_ui.interactive_image.pixmap_item.pixmap()
+
+        cmap = cm.get_cmap("viridis")
 
         # Create a QPainter to draw on the pixmap
         painter = QPainter(self.pixmap)
         pen = QPen(Qt.NoPen)  # No outline for the circles
         painter.setPen(pen)
-        brush = QBrush(QColor(255, 0, 0, 127))  # Semi-transparent red
-        painter.setBrush(brush)
 
         # Draw red filled circles at the spot positions
-        for spot, labels in zip(self.spots, self.labels):
+        for spot, prob in zip(self.spots, self.binding_probability):
 
             x, y, r = spot
+            rgba = cmap(prob)
+            color = QColor(
+                int(rgba[0] * 255),
+                int(rgba[1] * 255),
+                int(rgba[2] * 255),
+                int(rgba[3] * 255),
+            )
+            brush = QBrush(color)
+            painter.setBrush(brush)
             painter.drawEllipse(x - r, y - r, 2 * r, 2 * r)
 
         painter.end()  # Finish painting

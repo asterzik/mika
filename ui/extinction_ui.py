@@ -79,6 +79,8 @@ class ExtinctionUi:
         self.metric = None
         self.averaged_metric = None
         self.time_average_curves = None
+        # TODO do I need to set this to None, after selected points changed?
+        self.individual_metric = None
 
         self.regressor_selection_ui()
         self.metric_selection_ui()
@@ -705,7 +707,22 @@ class ExtinctionUi:
         )[0]
 
     def get_binding_probability(self):
-        binding_probability = np.zeros(self.num_spots)
+        if self.individual_metric is None:
+            self.regression(average_first=False)
+
+        range1 = self.individual_metric[self.time_range1_indices, :, 0]
+        range1_means = np.mean(range1, axis=0)
+        range1_std = np.std(range1, axis=0)
+
+        range2 = self.individual_metric[self.time_range2_indices, :, 0]
+        range2_means = np.mean(range2, axis=0)
+        range2_std = np.std(range2, axis=0)
+
+        diff = np.abs(range2_means - range1_means)
+        diff_std = np.sqrt(range1_std * range1_std + range2_std * range2_std)
+
+        binding_probability = diff / (3 * diff_std)
+        return binding_probability
 
     def get_statistics(self):
         # Calculate mean and std for range1
