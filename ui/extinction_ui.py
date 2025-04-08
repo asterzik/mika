@@ -25,6 +25,7 @@ from misc.profiling import ProfileContext
 import multiprocessing as mp
 
 from enum import Enum
+import gc
 
 
 class RegressorType(Enum):
@@ -129,6 +130,9 @@ class ExtinctionUi:
 
     def computeEverything(self):
         self.individual_metric = None
+        self.regressors = None
+        self.averaged_regressors = None
+        gc.collect()
         self.computeExtinction()
         self.setAllIndices()
         if self.curves is None:
@@ -176,8 +180,12 @@ class ExtinctionUi:
 
     def updateAverageGroups(self):
         if self.average_first_radio.isChecked():
-            self.averageGroups()
-        self.regression(self.average_first_radio.isChecked(), first=False)
+            if self.averaged_regressors is None:
+                self.averageGroups()
+                self.regression(self.average_first_radio.isChecked(), first=False)
+        else:
+            if self.regressors is None:
+                self.regression(self.average_first_radio.isChecked(), first=False)
         self.draw()
         self.parent.time_series.updateCurveData()
 
@@ -281,6 +289,10 @@ class ExtinctionUi:
         else:
             self.poly_degree_spin.setEnabled(False)
             self.poly_degree_spin.setStyleSheet("QSpinBox { color: gray; }")
+        self.averaged_regressors = None
+        self.regressors = None
+        self.individual_metric = None
+        gc.collect()
         self.regression(self.average_first_radio.isChecked(), first=False)
         self.updateCurvesData()
         self.parent.time_series.updateCurveData()
