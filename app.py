@@ -230,13 +230,17 @@ class MainWindow(QMainWindow):
         )
 
         # Call the compute extinction method
-        self.spot_ui.circles.compute_extinction()
 
         if self.pipeline_stack_layout.currentIndex() == 1:
             self.extinction_ui.computeEverything()
             self.extinction_ui.updateDataPoints()
             self.extinction_ui.updateCurvesData()
             self.time_series.updateCurveData()
+            means, stds = self.extinction_ui.get_statistics()
+            group_labels = self.extinction_ui.get_groups()
+            self.statistics_view.init_groups(means, stds, group_labels)
+        else:
+            self.spot_ui.circles.compute_extinction()
 
     def set_denoising_method(self):
         # Update the denoising method based on the checked button
