@@ -200,7 +200,7 @@ class ExtinctionUi:
 
         # Add spin box for polynomial degree
         self.poly_degree_spin = QSpinBox()
-        self.poly_degree_spin.setValue(5)
+        self.poly_degree_spin.setValue(3)
         self.poly_degree_spin.setEnabled(False)  # Only enable when poly is selected
         self.poly_degree_spin.setStyleSheet("QSpinBox { color: gray; }")
 
