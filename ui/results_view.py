@@ -11,10 +11,19 @@ from PySide6.QtWidgets import (
     QRadioButton,
     QSpacerItem,
     QDoubleSpinBox,
+    QFileDialog,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPainter, QPen, QColor, QBrush, QLinearGradient, QFont
-from misc.graphics_view import CustomGraphicsView
+from PySide6.QtCore import Qt, QRectF
+from PySide6.QtGui import (
+    QPainter,
+    QPen,
+    QColor,
+    QBrush,
+    QLinearGradient,
+    QPixmap,
+    QImage,
+)
+from misc.graphics_view import SpotMetricsView
 import matplotlib.cm as cm
 import numpy as np
 
@@ -125,7 +134,7 @@ class ResultsView:
         self.content_layout = QHBoxLayout()
 
         # Add the graphics view (image display)
-        self.graphics_view = CustomGraphicsView(self)
+        self.graphics_view = SpotMetricsView(self)
         self.graphics_scene = QGraphicsScene(self.graphics_view)
         self.graphics_view.setScene(self.graphics_scene)
 
@@ -331,3 +340,60 @@ class ResultsView:
         self.lower = lower
         self.upper = upper
         self.draw()
+
+    def saveImageAndLegend(self):
+        file_path, _ = QFileDialog.getSaveFileName(
+            self.widget,
+            "Save Image",
+            "spot_diff_" + self.getCurrentMode() + ".png",
+            "PNG Files (*.png)",
+        )
+        if not file_path:
+            return
+
+        view_pixmap = QPixmap(self.graphics_view.viewport().size())
+        self.graphics_view.viewport().render(view_pixmap)
+
+        # Render the color legend
+        legend_pixmap = QPixmap(self.legend.size())
+        self.legend.render(legend_pixmap)
+
+        # Combine both into one image
+        final_width = view_pixmap.width() + legend_pixmap.width()
+        final_height = max(view_pixmap.height(), legend_pixmap.height())
+        final_image = QImage(final_width, final_height, QImage.Format_ARGB32)
+        final_image.fill(Qt.white)
+
+        painter = QPainter(final_image)
+        painter.drawPixmap(0, 0.5 * (final_height - view_pixmap.height()), view_pixmap)
+        painter.drawPixmap(
+            view_pixmap.width(),
+            0.5 * (final_height - legend_pixmap.height()),
+            legend_pixmap,
+        )
+        painter.end()
+
+        final_image.save(file_path)
+
+    def exportDataToCSV(self):
+        file_path, _ = QFileDialog.getSaveFileName(
+            self.widget,
+            "Save CSV",
+            "spot_diff_" + self.getCurrentMode() + ".csv",
+            "CSV Files (*.csv)",
+        )
+        if not file_path:
+            return
+
+        with open(file_path, "w") as f:
+            f.write("x" + "," + ",".join(map(str, self.spots[:, 0])) + "\n")
+            f.write("y" + "," + ",".join(map(str, self.spots[:, 1])) + "\n")
+            f.write(self.getCurrentMode() + "," + ",".join(map(str, self.value)) + "\n")
+
+    def getCurrentMode(self):
+        if self.abs_radio.isChecked():
+            return "abs_diff"
+        elif self.std_radio.isChecked():
+            return "std"
+        elif self.binary_radio.isChecked():
+            return "binary"

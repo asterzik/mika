@@ -16,7 +16,7 @@ from PySide6.QtCore import Qt
 
 from PySide6.QtCore import Qt
 
-from misc.graphics_view import CustomGraphicsView
+from misc.graphics_view import SpotDetectionView
 
 
 class SpotSelectionUi:
@@ -26,8 +26,8 @@ class SpotSelectionUi:
         self.widget = QWidget()
         self.layout0 = QHBoxLayout()
 
-        # Create a CustomGraphicsView and QGraphicsScene
-        self.graphics_view = CustomGraphicsView(self)
+        # Create a SpotDetectionView and QGraphicsScene
+        self.graphics_view = SpotDetectionView(self)
         self.graphics_scene = QGraphicsScene(self.graphics_view)
         self.graphics_view.setScene(self.graphics_scene)
 
@@ -45,7 +45,7 @@ class SpotSelectionUi:
         self.graphics_view.fitInView(self.pixmap_item, Qt.KeepAspectRatio)
 
         self.widget.setLayout(self.layout0)
-        # Add the CustomGraphicsView to the layout
+        # Add the SpotDetectionView to the layout
         self.layout0.addWidget(self.graphics_view, stretch=3)
 
         self.image_selection_layout = QVBoxLayout()

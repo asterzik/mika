@@ -4,3 +4,5 @@
 *__pycache__*
 export
 ui/examples_pyqtgraph.py
+*.png
+*.csv
