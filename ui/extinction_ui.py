@@ -260,25 +260,36 @@ class ExtinctionUi:
 
         self.button_layout.addWidget(group_box)
 
-        average_first = self.average_first_radio.isChecked()
         self.max_radio.toggled[bool].connect(
-            lambda checked: self.updateMetric(average_first, checked, False)
+            lambda checked: self.updateMetric(
+                self.average_first_radio.isChecked(), checked, False
+            )
         )
         self.centroid_radio.toggled[bool].connect(
-            lambda checked: self.updateMetric(average_first, checked, False)
+            lambda checked: self.updateMetric(
+                self.average_first_radio.isChecked(), checked, False
+            )
         )
 
         self.centroid_left_bound_radio.toggled[bool].connect(
-            lambda checked: self.updateMetric(average_first, checked, False)
+            lambda checked: self.updateMetric(
+                self.average_first_radio.isChecked(), checked, False
+            )
         )
         self.centroid_half_height_radio.toggled[bool].connect(
-            lambda checked: self.updateMetric(average_first, checked, False)
+            lambda checked: self.updateMetric(
+                self.average_first_radio.isChecked(), checked, False
+            )
         )
         self.centroid_left_bound_half_height_radio.toggled[bool].connect(
-            lambda checked: self.updateMetric(average_first, checked, False)
+            lambda checked: self.updateMetric(
+                self.average_first_radio.isChecked(), checked, False
+            )
         )
         self.inflection_radio.toggled[bool].connect(
-            lambda checked: self.updateMetric(average_first, checked, False)
+            lambda checked: self.updateMetric(
+                self.average_first_radio.isChecked(), checked, False
+            )
         )
         # self.cross_correlation_radio.toggled[bool].connect(self.updateMetric)
 
