@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QRadioButton,
     QSpacerItem,
+    QDoubleSpinBox,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush, QLinearGradient, QFont
@@ -221,6 +222,18 @@ class ResultsView:
         self.color_map_group.setLayout(cm_radio_layout)
         self.right_panel_layout.addWidget(self.color_map_group)
 
+        # Transparency
+        self.transparency_spin_box = QDoubleSpinBox()
+        self.transparency_spin_box.setRange(0.0, 1.0)
+        self.transparency_spin_box.setSingleStep(0.1)
+        self.transparency_spin_box.setValue(0)
+
+        self.transparency_label = QLabel("Transparency")
+        self.right_panel_layout.addWidget(self.transparency_label)
+        self.right_panel_layout.addWidget(self.transparency_spin_box)
+
+        self.transparency_spin_box.valueChanged.connect(self.onTransparencyChanged)
+
         self.right_panel_layout.addStretch(1)
 
     def onColorModeChanged(self):
@@ -268,6 +281,9 @@ class ResultsView:
         self.draw()
         self.legend.updateCmap()
 
+    def onTransparencyChanged(self):
+        self.draw()
+
     def setData(self, spots, diff, diff_std):
         self.spots = spots
         self.diff = diff
@@ -297,7 +313,7 @@ class ResultsView:
                 int(rgba[0] * 255),
                 int(rgba[1] * 255),
                 int(rgba[2] * 255),
-                int(rgba[3] * 255),
+                int((1.0 - self.transparency_spin_box.value()) * 255),
             )
             brush = QBrush(color)
             painter.setBrush(brush)
