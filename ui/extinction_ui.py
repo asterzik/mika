@@ -719,7 +719,7 @@ class ExtinctionUi:
             (self.time_series_x >= range2[0]) & (self.time_series_x <= range2[1])
         )[0]
 
-    def get_binding_probability(self):
+    def get_diff_and_std(self):
         if self.individual_metric is None:
             self.regression(average_first=False)
 
@@ -734,8 +734,7 @@ class ExtinctionUi:
         diff = np.abs(range2_means - range1_means)
         diff_std = np.sqrt(range1_std * range1_std + range2_std * range2_std)
 
-        binding_probability = diff / (3 * diff_std)
-        return binding_probability
+        return diff, diff_std
 
     def get_statistics(self):
         # Calculate mean and std for range1

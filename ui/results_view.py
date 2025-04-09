@@ -6,6 +6,10 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QVBoxLayout,
     QLabel,
+    QLineEdit,
+    QGroupBox,
+    QRadioButton,
+    QSpacerItem,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush, QLinearGradient, QFont
@@ -17,38 +21,56 @@ cmap = cm.get_cmap("viridis")
 
 
 class ColorMapLegend(QWidget):
-    def __init__(self, width=80, height=600, parent=None):
+    def __init__(self, color_image, width=80, height=600, parent=None):
+        self.color_image = color_image
         super().__init__(parent)
         self.setFixedSize(width, height)
-        self.setFixedSize(width, height)
-        self.setMouseTracking(True)
-        self.setToolTip(
-            """
-                <b>Binding Score:</b> <br>
-                |mean(range1) - mean(range2)| / (3 × std) <br><br>
-                <i>Used to estimate strength of signal difference.</i>
-            """
-        )
+
         self.cmap = cm.get_cmap("viridis")
+        self.lower_bound = 0
+        self.upper_bound = 1
+        self.crit = None
+
+        # Create input fields
+        self.upper_input = QLineEdit(str(self.upper_bound), self)
+        self.lower_input = QLineEdit(str(self.lower_bound), self)
+
+        self.upper_input.setFixedHeight(20)
+        self.lower_input.setFixedHeight(20)
+        self.upper_input.setAlignment(Qt.AlignCenter)
+        self.lower_input.setAlignment(Qt.AlignCenter)
+
+        # Positioning
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        layout.addWidget(self.upper_input)
+        layout.addStretch(1)
+        layout.addWidget(self.lower_input)
+
+        # Connect signals
+        self.upper_input.editingFinished.connect(self.boundsChanged)
+        self.lower_input.editingFinished.connect(self.boundsChanged)
+
+    def boundsChanged(self):
+        upper = float(self.upper_input.text())
+        lower = float(self.lower_input.text())
+        self.upper_bound = upper
+        self.lower_bound = lower
+        self.color_image.updateBounds(lower, upper)
+        self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
         w, h = self.width(), self.height()
+        top = self.upper_input.height() + 4
+        bottom = h - self.lower_input.height() - 4
+        gradient_height = bottom - top
 
-        # --- Sizes ---
-        text_margin = 4
-        label_height = 14
-        gradient_top = label_height + text_margin
-        gradient_bottom = h - label_height - text_margin
-        gradient_height = gradient_bottom - gradient_top
-
-        painter.setPen(Qt.black)
-        painter.drawText(0, 0, w, label_height, Qt.AlignHCenter | Qt.AlignBottom, "1")
-
-        # --- Draw gradient ---
-        gradient = QLinearGradient(0, gradient_top, 0, gradient_bottom)
+        # Draw gradient
+        gradient = QLinearGradient(0, top, 0, bottom)
         for i in range(100):
             pos = i / 99
             r, g, b, a = self.cmap(pos)
@@ -57,17 +79,28 @@ class ColorMapLegend(QWidget):
                 QColor(int(r * 255), int(g * 255), int(b * 255), int(a * 255)),
             )
 
-        painter.fillRect(5, gradient_top, w - 10, gradient_height, gradient)
+        painter.fillRect(5, top, w - 10, gradient_height, gradient)
 
-        # --- Draw bottom label ---
-        painter.drawText(
-            0,
-            h - label_height,
-            w,
-            label_height,
-            Qt.AlignHCenter | Qt.AlignTop,
-            "0",
-        )
+        # Draw critical point if it's within bounds
+        if self.crit is not None and self.lower_bound < self.crit < self.upper_bound:
+            rel_pos = (self.crit - self.lower_bound) / (
+                self.upper_bound - self.lower_bound
+            )
+            y_pos = top + (1.0 - rel_pos) * gradient_height
+            pen = QPen(Qt.black)
+            pen.setWidth(2)
+            painter.setPen(pen)
+            painter.drawLine(0, int(y_pos), w, int(y_pos))
+
+    def updateBounds(self, lower_bound, upper_bound):
+        self.lower_bound = lower_bound
+        self.upper_bound = upper_bound
+        self.upper_input.setText(str(self.upper_bound))
+        self.lower_input.setText(str(self.lower_bound))
+
+    def updateCriticalPoint(self, crit):
+        self.crit = crit
+        self.update()
 
 
 class ResultsView:
@@ -87,7 +120,7 @@ class ResultsView:
         self.main_layout.addWidget(title_label)
 
         # Create the content layout (image and colormap legend)
-        content_layout = QHBoxLayout()
+        self.content_layout = QHBoxLayout()
 
         # Add the graphics view (image display)
         self.graphics_view = CustomGraphicsView(self)
@@ -106,18 +139,74 @@ class ResultsView:
         self.graphics_view.fitInView(self.pixmap_item, Qt.KeepAspectRatio)
 
         # Add the graphics view to the content layout
-        content_layout.addWidget(self.graphics_view)
+        self.content_layout.addWidget(self.graphics_view)
 
         # Add the colormap legend to the content layout
-        legend = ColorMapLegend()
-        content_layout.addWidget(legend)
+        self.legend = ColorMapLegend(self)
+        self.content_layout.addWidget(self.legend)
 
         # Add the content layout to the main layout
-        self.main_layout.addLayout(content_layout)
+        self.main_layout.addLayout(self.content_layout)
 
-    def setData(self, spots, binding_probability):
+        # --- Radio Buttons for Color Mode ---
+        self.color_mode_group = QGroupBox("Coloring Mode")
+        self.color_mode_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+
+        self.abs_radio = QRadioButton("Abs. Difference")
+        self.std_radio = QRadioButton("Std. Deviation")
+        self.binary_radio = QRadioButton("Binary Class.")
+        self.abs_radio.setChecked(True)
+
+        radio_layout = QVBoxLayout()
+        radio_layout.setContentsMargins(6, 6, 6, 6)
+        radio_layout.setSpacing(4)  # Compact spacing between options
+        radio_layout.addWidget(self.abs_radio)
+        radio_layout.addWidget(self.std_radio)
+        radio_layout.addWidget(self.binary_radio)
+
+        self.color_mode_group.setLayout(radio_layout)
+        self.content_layout.addWidget(self.color_mode_group)
+
+        self.abs_radio.toggled.connect(self.onColorModeChanged)
+        self.std_radio.toggled.connect(self.onColorModeChanged)
+        self.binary_radio.toggled.connect(self.onColorModeChanged)
+
+    def onColorModeChanged(self):
+        if self.abs_radio.isChecked():
+            self.value = self.diff
+            self.lower = round(self.min, 2)
+            self.upper = round(self.max, 2)
+            self.legend.updateBounds(self.lower, self.upper)
+            self.legend.updateCriticalPoint(3 * np.mean(self.diff_std))
+            self.draw()
+        elif self.std_radio.isChecked():
+            self.value = self.diff_std
+            self.lower = round(np.min(self.diff_std), 2)
+            self.upper = round(np.max(self.diff_std), 2)
+            self.legend.updateBounds(self.lower, self.upper)
+            self.legend.updateCriticalPoint(np.mean(self.diff_std))
+            self.draw()
+        elif self.binary_radio.isChecked():
+            self.value = self.diff > 3 * np.mean(self.diff_std)
+            self.lower = 0
+            self.upper = 1
+            self.legend.updateBounds(False, True)
+            self.legend.updateCriticalPoint(None)
+            self.draw()
+
+    def setData(self, spots, diff, diff_std):
         self.spots = spots
-        self.binding_probability = binding_probability
+        self.diff = diff
+        self.diff_std = diff_std
+        self.min = np.min(diff)
+        self.max = np.max(diff)
+        self.lower = self.min
+        self.upper = self.max
+        self.legend.updateBounds(round(self.min, 2), round(self.max, 2))
+        crit = 3 * np.mean(self.diff_std)
+        self.legend.updateCriticalPoint(crit)
+
+        self.value = self.diff
 
     def draw(self):
         # Create a QPainter to draw on the pixmap
@@ -127,9 +216,11 @@ class ResultsView:
         painter.setPen(pen)
 
         # Draw red filled circles at the spot positions
-        for spot, prob in zip(self.spots, self.binding_probability):
+        for spot, value in zip(self.spots, self.value):
             x, y, r = spot
-            rgba = cmap(prob)
+            # Normalize diff to [0,1] depending on min and max
+            value = (value - self.lower) / (self.upper - self.lower)
+            rgba = cmap(value)
             color = QColor(
                 int(rgba[0] * 255),
                 int(rgba[1] * 255),
@@ -147,3 +238,8 @@ class ResultsView:
 
         # Update the scene with the new pixmap
         self.graphics_scene.update()
+
+    def updateBounds(self, lower, upper):
+        self.lower = lower
+        self.upper = upper
+        self.draw()

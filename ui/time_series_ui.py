@@ -25,7 +25,7 @@ class TimeSeries:
         self.parent = parent
         self.widget = pg.PlotWidget()
         self.widget.setBackground("w")
-        self.widget.setTitle("Time Series", color="black")
+        self.widget.setTitle("Sensorgram", color="black")
         self.x_values = None
         self.y_values = None
         self.time_indices = None
