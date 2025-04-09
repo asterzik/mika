@@ -113,7 +113,7 @@ class MainWindow(QMainWindow):
         self.analysis_layer_button = QPushButton("Analysis", self)
         self.analysis_layer_button.clicked.connect(self.analysis_layer_button_clicked)
 
-        self.results_layer_button = QPushButton("Binding score", self)
+        self.results_layer_button = QPushButton("Per Spot Difference Metrics", self)
         self.results_layer_button.setEnabled(False)
         self.results_layer_button.setStyleSheet(
             "background-color: #d3d3d3; color: #888888;"

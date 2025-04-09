@@ -17,8 +17,6 @@ from misc.graphics_view import CustomGraphicsView
 import matplotlib.cm as cm
 import numpy as np
 
-cmap = cm.get_cmap("viridis")
-
 
 class ColorMapLegend(QWidget):
     def __init__(self, color_image, width=80, height=600, parent=None):
@@ -26,7 +24,6 @@ class ColorMapLegend(QWidget):
         super().__init__(parent)
         self.setFixedSize(width, height)
 
-        self.cmap = cm.get_cmap("viridis")
         self.lower_bound = 0
         self.upper_bound = 1
         self.crit = None
@@ -73,7 +70,7 @@ class ColorMapLegend(QWidget):
         gradient = QLinearGradient(0, top, 0, bottom)
         for i in range(100):
             pos = i / 99
-            r, g, b, a = self.cmap(pos)
+            r, g, b, a = self.color_image.cmap(pos)
             gradient.setColorAt(
                 1.0 - pos,
                 QColor(int(r * 255), int(g * 255), int(b * 255), int(a * 255)),
@@ -102,10 +99,14 @@ class ColorMapLegend(QWidget):
         self.crit = crit
         self.update()
 
+    def updateCmap(self):
+        self.update()
+
 
 class ResultsView:
     def __init__(self, parent=None):
         self.parent = parent
+        self.cmap = None
 
         # Create the main widget and layout
         self.widget = QWidget()
@@ -115,7 +116,7 @@ class ResultsView:
         self.widget.setLayout(self.main_layout)
 
         # Add the title at the top
-        title_label = QLabel("Binding Score")
+        title_label = QLabel("Per Spot Difference Metrics")
         title_label.setAlignment(Qt.AlignCenter)
         self.main_layout.addWidget(title_label)
 
@@ -148,13 +149,22 @@ class ResultsView:
         # Add the content layout to the main layout
         self.main_layout.addLayout(self.content_layout)
 
+        # Layout for buttons and explanation
+        self.right_panel = QWidget()
+        self.right_panel_layout = QVBoxLayout()
+        self.right_panel.setLayout(self.right_panel_layout)
+        self.content_layout.addWidget(self.right_panel)
+        # self.graphics_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.right_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        self.right_panel.setFixedWidth(220)  # or any width that feels right
+
         # --- Radio Buttons for Color Mode ---
         self.color_mode_group = QGroupBox("Coloring Mode")
         self.color_mode_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
 
         self.abs_radio = QRadioButton("Abs. Difference")
         self.std_radio = QRadioButton("Std. Deviation")
-        self.binary_radio = QRadioButton("Binary Class.")
+        self.binary_radio = QRadioButton("Binary Classification")
         self.abs_radio.setChecked(True)
 
         radio_layout = QVBoxLayout()
@@ -165,11 +175,53 @@ class ResultsView:
         radio_layout.addWidget(self.binary_radio)
 
         self.color_mode_group.setLayout(radio_layout)
-        self.content_layout.addWidget(self.color_mode_group)
+        self.right_panel_layout.addWidget(self.color_mode_group)
 
         self.abs_radio.toggled.connect(self.onColorModeChanged)
         self.std_radio.toggled.connect(self.onColorModeChanged)
         self.binary_radio.toggled.connect(self.onColorModeChanged)
+
+        # Explanation box under the radio group
+        self.explanation_label = QLabel()
+        self.explanation_label.setWordWrap(True)
+        self.explanation_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.explanation_label.setStyleSheet(
+            "color: gray; font-size: 10pt; padding: 4px;"
+        )
+        self.explanation_label.setText(
+            "Shows absolute wavelength differences.\nCritical point = max expected shift."
+        )
+
+        # Fix width policy so it doesn't stretch the layout horizontally
+        self.explanation_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+
+        # Add to layout below the color_mode_group
+        self.right_panel_layout.addWidget(self.explanation_label)
+
+        # Color Map Group
+        self.color_map_group = QGroupBox("Color Maps")
+        self.color_map_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+
+        self.viridis_radio = QRadioButton("Viridis")
+        self.plasma_radio = QRadioButton("Plasma")
+        self.cividis_radio = QRadioButton("Cividis")
+        self.viridis_radio.setChecked(True)
+
+        cm_radio_layout = QVBoxLayout()
+        cm_radio_layout.setContentsMargins(6, 6, 6, 6)
+        cm_radio_layout.setSpacing(4)  # Compact spacing between options
+        cm_radio_layout.addWidget(self.viridis_radio)
+        cm_radio_layout.addWidget(self.plasma_radio)
+        cm_radio_layout.addWidget(self.cividis_radio)
+
+        self.viridis_radio.toggled.connect(self.onColorMapChanged)
+        self.plasma_radio.toggled.connect(self.onColorMapChanged)
+        self.cividis_radio.toggled.connect(self.onColorMapChanged)
+
+        self.color_map_group.setLayout(cm_radio_layout)
+        self.right_panel_layout.addWidget(self.color_map_group)
+
+        self.right_panel_layout.addStretch(1)
 
     def onColorModeChanged(self):
         if self.abs_radio.isChecked():
@@ -179,6 +231,11 @@ class ResultsView:
             self.legend.updateBounds(self.lower, self.upper)
             self.legend.updateCriticalPoint(3 * np.mean(self.diff_std))
             self.draw()
+            help_text = (
+                "Plot: Absolute of the mean wavelength difference between the two time windows.\n"
+                "\n"
+                "Black line: 3 * standard deviation of the difference averaged over all spots."
+            )
         elif self.std_radio.isChecked():
             self.value = self.diff_std
             self.lower = round(np.min(self.diff_std), 2)
@@ -186,6 +243,11 @@ class ResultsView:
             self.legend.updateBounds(self.lower, self.upper)
             self.legend.updateCriticalPoint(np.mean(self.diff_std))
             self.draw()
+            help_text = (
+                "Plot: Standard deviation of the mean wavelength difference between the two time windows.\n"
+                "\n"
+                "Black line: Average standard deviation over all spots."
+            )
         elif self.binary_radio.isChecked():
             self.value = self.diff > 3 * np.mean(self.diff_std)
             self.lower = 0
@@ -193,6 +255,18 @@ class ResultsView:
             self.legend.updateBounds(False, True)
             self.legend.updateCriticalPoint(None)
             self.draw()
+            help_text = "Plot: Binary classification of binding event: absolute difference > 3 * standard deviation."
+        self.explanation_label.setText(help_text)
+
+    def onColorMapChanged(self):
+        if self.viridis_radio.isChecked():
+            self.cmap = cm.get_cmap("viridis")
+        elif self.plasma_radio.isChecked():
+            self.cmap = cm.get_cmap("plasma")
+        elif self.cividis_radio.isChecked():
+            self.cmap = cm.get_cmap("cividis")
+        self.draw()
+        self.legend.updateCmap()
 
     def setData(self, spots, diff, diff_std):
         self.spots = spots
@@ -202,11 +276,9 @@ class ResultsView:
         self.max = np.max(diff)
         self.lower = self.min
         self.upper = self.max
-        self.legend.updateBounds(round(self.min, 2), round(self.max, 2))
-        crit = 3 * np.mean(self.diff_std)
-        self.legend.updateCriticalPoint(crit)
-
         self.value = self.diff
+        self.onColorMapChanged()
+        self.onColorModeChanged()
 
     def draw(self):
         # Create a QPainter to draw on the pixmap
@@ -220,7 +292,7 @@ class ResultsView:
             x, y, r = spot
             # Normalize diff to [0,1] depending on min and max
             value = (value - self.lower) / (self.upper - self.lower)
-            rgba = cmap(value)
+            rgba = self.cmap(value)
             color = QColor(
                 int(rgba[0] * 255),
                 int(rgba[1] * 255),
