@@ -185,7 +185,6 @@ class ResultsView:
         radio_layout.addWidget(self.binary_radio)
 
         self.color_mode_group.setLayout(radio_layout)
-        self.right_panel_layout.addWidget(self.color_mode_group)
 
         self.abs_radio.toggled.connect(self.onColorModeChanged)
         self.std_radio.toggled.connect(self.onColorModeChanged)
@@ -204,9 +203,6 @@ class ResultsView:
 
         # Fix width policy so it doesn't stretch the layout horizontally
         self.explanation_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
-
-        # Add to layout below the color_mode_group
-        self.right_panel_layout.addWidget(self.explanation_label)
 
         # Color Map Group
         self.color_map_group = QGroupBox("Color Maps")
@@ -243,6 +239,32 @@ class ResultsView:
 
         self.transparency_spin_box.valueChanged.connect(self.onTransparencyChanged)
 
+        self.right_panel_layout.addWidget(self.color_mode_group)
+        self.right_panel_layout.addWidget(self.explanation_label)
+
+        # Binding indication ring
+        self.ring_group = QGroupBox("Comparison to 3 * std")
+        self.ring_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+
+        self.no_ring_radio = QRadioButton("No Ring")
+        self.own_ring_radio = QRadioButton("Indicate > 3 * own std")
+        self.mean_ring_radio = QRadioButton("Indicate > 3 * mean std")
+        self.own_ring_radio.setChecked(True)
+
+        ring_radio_layout = QVBoxLayout()
+        ring_radio_layout.setContentsMargins(6, 6, 6, 6)
+        ring_radio_layout.setSpacing(4)  # Compact spacing between options
+        ring_radio_layout.addWidget(self.no_ring_radio)
+        ring_radio_layout.addWidget(self.own_ring_radio)
+        ring_radio_layout.addWidget(self.mean_ring_radio)
+
+        self.no_ring_radio.toggled.connect(self.onRingRadioChanged)
+        self.own_ring_radio.toggled.connect(self.onRingRadioChanged)
+        self.mean_ring_radio.toggled.connect(self.onRingRadioChanged)
+
+        self.ring_group.setLayout(ring_radio_layout)
+        self.right_panel_layout.addWidget(self.ring_group)
+
         self.right_panel_layout.addStretch(1)
 
     def onColorModeChanged(self):
@@ -258,6 +280,7 @@ class ResultsView:
                 "\n"
                 "Black line: 3 * standard deviation of the difference averaged over all spots."
             )
+            self.ring_group.show()
         elif self.std_radio.isChecked():
             self.value = self.diff_std
             self.lower = round(np.min(self.diff_std), 2)
@@ -270,6 +293,7 @@ class ResultsView:
                 "\n"
                 "Black line: Average standard deviation over all spots."
             )
+            self.ring_group.hide()
         elif self.binary_radio.isChecked():
             self.value = self.diff > 3 * np.mean(self.diff_std)
             self.lower = 0
@@ -278,6 +302,7 @@ class ResultsView:
             self.legend.updateCriticalPoint(None)
             self.draw()
             help_text = "Plot: Binary classification of binding event: absolute difference > 3 * standard deviation."
+            self.ring_group.hide()
         self.explanation_label.setText(help_text)
 
     def onColorMapChanged(self):
@@ -291,6 +316,9 @@ class ResultsView:
         self.legend.updateCmap()
 
     def onTransparencyChanged(self):
+        self.draw()
+
+    def onRingRadioChanged(self):
         self.draw()
 
     def setData(self, spots, diff, diff_std):
@@ -313,11 +341,11 @@ class ResultsView:
         painter.setPen(pen)
 
         # Draw red filled circles at the spot positions
-        for spot, value in zip(self.spots, self.value):
+        for spot, value, std in zip(self.spots, self.value, self.diff_std):
             x, y, r = spot
             # Normalize diff to [0,1] depending on min and max
-            value = (value - self.lower) / (self.upper - self.lower)
-            rgba = self.cmap(value)
+            norm_value = (value - self.lower) / (self.upper - self.lower)
+            rgba = self.cmap(norm_value)
             color = QColor(
                 int(rgba[0] * 255),
                 int(rgba[1] * 255),
@@ -327,6 +355,17 @@ class ResultsView:
             brush = QBrush(color)
             painter.setBrush(brush)
             painter.drawEllipse(x - r, y - r, 2 * r, 2 * r)
+
+            if self.abs_radio.isChecked() and not self.no_ring_radio.isChecked():
+                if self.own_ring_radio.isChecked():
+                    compare = std
+                elif self.mean_ring_radio.isChecked():
+                    compare = np.mean(self.diff_std)
+                if value > 3 * compare:
+                    ring_pen = QPen(Qt.black)
+                    ring_pen.setWidth(2)
+                    painter.setPen(ring_pen)
+                    painter.drawEllipse(x - r, y - r, 2 * r, 2 * r)
 
         painter.end()  # Finish painting
 
