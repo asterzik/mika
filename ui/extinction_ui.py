@@ -64,6 +64,7 @@ class ExtinctionUi:
         self.layout.addLayout(self.selection_layout)
         self.extinction_display_options()
         self.group_averaging_options()
+        self.selection_layout.addStretch()
         self.plot_widget.setBackground("w")
         self.plot_widget.setTitle("Extinction", color="black")
         self.spot_labels = None

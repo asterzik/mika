@@ -57,6 +57,7 @@ class SpotSelectionUi:
         # self.image_selection_layout.addWidget(self.export_button)
 
         self.build_image_selection_group()
+        self.image_selection_layout.addStretch()
 
     def export(self):
         proposed_filename = os.path.join(os.curdir, "spot_selection.png")
