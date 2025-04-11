@@ -178,7 +178,9 @@ class MainWindow(QMainWindow):
         # # Add the denoising group box to the sidebar layout
         # sidebar_layout.addWidget(denoising_group_box)
 
-        sidebar_layout.addLayout(self.extinction_ui.button_layout)
+        # sidebar_layout.addLayout(self.extinction_ui.button_layout)
+        sidebar_layout.addWidget(self.extinction_ui.reg_selection_group_box)
+        sidebar_layout.addWidget(self.extinction_ui.metric_selection_group_box)
 
         # Add export section to the sidebar layout
         export_layout = QVBoxLayout()
@@ -193,6 +195,7 @@ class MainWindow(QMainWindow):
         export_layout.addWidget(export_extinction_button)
         export_layout.addWidget(export_timeseries_button)
         sidebar_layout.addWidget(export_group_box)
+        sidebar_layout.addStretch()
 
     def spot_detection_layer_button_clicked(self):
         self.pipeline_stack_layout.setCurrentIndex(0)

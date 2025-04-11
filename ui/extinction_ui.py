@@ -190,7 +190,7 @@ class ExtinctionUi:
         self.parent.time_series.updateCurveData()
 
     def regressor_selection_ui(self):
-        group_box = QGroupBox("Select Regressor")
+        self.reg_selection_group_box = QGroupBox("Select Regressor")
         group_layout = QVBoxLayout()
 
         self.no_reg_radio = QRadioButton(RegressorType.NO_REG.value)
@@ -223,16 +223,16 @@ class ExtinctionUi:
         group_layout.addLayout(poly_layout)
         group_layout.addWidget(self.gp_radio)
 
-        group_box.setLayout(group_layout)
+        self.reg_selection_group_box.setLayout(group_layout)
 
-        self.button_layout.addWidget(group_box)
+        # self.button_layout.addWidget(group_box)
 
         # Connect all buttons to the update function
         for btn in self.regressor_map:
             btn.clicked.connect(self.updateRegressor)
 
     def metric_selection_ui(self):
-        group_box = QGroupBox("Select Metric")
+        self.metric_selection_group_box = QGroupBox("Select Metric")
         group_layout = QVBoxLayout()
 
         self.max_radio = QRadioButton("Maximum")
@@ -256,9 +256,9 @@ class ExtinctionUi:
         group_layout.addWidget(self.inflection_radio)
         # group_layout.addWidget(self.cross_correlation_radio)
 
-        group_box.setLayout(group_layout)
+        self.metric_selection_group_box.setLayout(group_layout)
 
-        self.button_layout.addWidget(group_box)
+        # self.button_layout.addWidget(group_box)
 
         self.max_radio.toggled[bool].connect(
             lambda checked: self.updateMetric(
