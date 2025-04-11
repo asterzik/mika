@@ -18,14 +18,18 @@ class StatisticsView(QWidget):
         self.label_references = {}  # Dictionary to store references to QLabel widgets
 
     def clear(self):
-        for i in reversed(range(self.layout.count())):
-            widget = self.layout.itemAt(i).widget()
+        while self.layout.count():
+            item = self.layout.takeAt(0)
+            widget = item.widget()
             if widget is not None:
-                widget.deleteLater()
-        self.label_references.clear()  # Clear the references dictionary
+                widget.setParent(None)  # Remove from layout
+                widget.deleteLater()  # Schedule deletion
+        self.label_references.clear()
 
     def init_groups(self, means, stds, group_labels):
+        self.setUpdatesEnabled(False)
         self.clear()
+
         title_label = QLabel(self.title)
         self.layout.addWidget(title_label)
         for i, label in enumerate(group_labels):
@@ -35,6 +39,9 @@ class StatisticsView(QWidget):
             frame = self.create_stat_frame(group_name, label, mean, std, i)
             self.layout.addWidget(frame)
         self.layout.addStretch()
+
+        self.setUpdatesEnabled(True)
+        self.update()
 
     def create_stat_frame(self, group_name, group_label, mean, std, index):
         """Creates a single-line frame with statistics for a group."""
