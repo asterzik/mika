@@ -5,7 +5,7 @@ from math import sqrt
 
 
 class StatisticsView(QWidget):
-    def __init__(self, parent, title="Means and Standard Deviations"):
+    def __init__(self, parent, title="Means and Standard Errors"):
         super().__init__()
         self.title = title
         self.parent = parent

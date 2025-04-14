@@ -737,11 +737,12 @@ class ExtinctionUi:
 
         range1 = self.individual_metric[self.time_range1_indices, :, 0]
         range1_means = np.mean(range1, axis=0)
-        range1_std = np.std(range1, axis=0)
+        # Divide std by sample size to compute standard error of the mean
+        range1_std = np.std(range1, axis=0) / np.sqrt(len(range1))
 
         range2 = self.individual_metric[self.time_range2_indices, :, 0]
         range2_means = np.mean(range2, axis=0)
-        range2_std = np.std(range2, axis=0)
+        range2_std = np.std(range2, axis=0) / np.sqrt(len(range2))
 
         diff = np.abs(range2_means - range1_means)
         diff_std = np.sqrt(range1_std * range1_std + range2_std * range2_std)
@@ -751,15 +752,20 @@ class ExtinctionUi:
     def get_statistics(self):
         # Calculate mean and std for range1
         range1_means = np.mean(self.time_series_y[self.time_range1_indices], axis=0)
-        range1_std = np.std(self.time_series_y[self.time_range1_indices], axis=0)
+        # Divide std by sample size to compute standard error of the mean
+        range1_std = np.std(
+            self.time_series_y[self.time_range1_indices], axis=0
+        ) / np.sqrt(len(self.time_range1_indices))
 
         # Calculate mean and std for range2
         range2_means = np.mean(self.time_series_y[self.time_range2_indices], axis=0)
-        range2_std = np.std(self.time_series_y[self.time_range2_indices], axis=0)
+        range2_std = np.std(
+            self.time_series_y[self.time_range2_indices], axis=0
+        ) / np.sqrt(len(self.time_range2_indices))
 
         # Calculate overall mean and std
         mean = np.mean(self.time_series_y, axis=0)
-        std = np.std(self.time_series_y, axis=0)
+        std = np.std(self.time_series_y, axis=0) / np.sqrt(len(self.time_series_y))
 
         # Stack all means and stds
         means = np.vstack((mean, range1_means, range2_means))

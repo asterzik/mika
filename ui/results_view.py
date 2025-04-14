@@ -231,7 +231,7 @@ class ResultsView:
         self.transparency_spin_box = QDoubleSpinBox()
         self.transparency_spin_box.setRange(0.0, 1.0)
         self.transparency_spin_box.setSingleStep(0.1)
-        self.transparency_spin_box.setValue(0)
+        self.transparency_spin_box.setValue(0.5)
 
         self.transparency_label = QLabel("Transparency")
         self.right_panel_layout.addWidget(self.transparency_label)
@@ -243,12 +243,12 @@ class ResultsView:
         self.right_panel_layout.addWidget(self.explanation_label)
 
         # Binding indication ring
-        self.ring_group = QGroupBox("Comparison to 3 * std")
+        self.ring_group = QGroupBox("Comparison to 3 * SEM")
         self.ring_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
 
         self.no_ring_radio = QRadioButton("No Ring")
-        self.own_ring_radio = QRadioButton("Indicate > 3 * own std")
-        self.mean_ring_radio = QRadioButton("Indicate > 3 * mean std")
+        self.own_ring_radio = QRadioButton("Indicate > 3 * own SEM")
+        self.mean_ring_radio = QRadioButton("Indicate > 3 * mean SEM")
         self.own_ring_radio.setChecked(True)
 
         ring_radio_layout = QVBoxLayout()
@@ -278,7 +278,7 @@ class ResultsView:
             help_text = (
                 "Plot: Absolute of the mean wavelength difference between the two time windows.\n"
                 "\n"
-                "Black line: 3 * standard deviation of the difference averaged over all spots."
+                "Black line: 3 * standard error of the difference averaged over all spots."
             )
             self.ring_group.show()
         elif self.std_radio.isChecked():
@@ -289,9 +289,9 @@ class ResultsView:
             self.legend.updateCriticalPoint(np.mean(self.diff_std))
             self.draw()
             help_text = (
-                "Plot: Standard deviation of the mean wavelength difference between the two time windows.\n"
+                "Plot: Standard error of the mean wavelength difference between the two time windows.\n"
                 "\n"
-                "Black line: Average standard deviation over all spots."
+                "Black line: Average standard error of the mean over all spots."
             )
             self.ring_group.hide()
         elif self.binary_radio.isChecked():
@@ -301,7 +301,7 @@ class ResultsView:
             self.legend.updateBounds(False, True)
             self.legend.updateCriticalPoint(None)
             self.draw()
-            help_text = "Plot: Binary classification of binding event: absolute difference > 3 * standard deviation."
+            help_text = "Plot: Binary classification of binding event: absolute difference > 3 * standard error."
             self.ring_group.hide()
         self.explanation_label.setText(help_text)
 
@@ -433,6 +433,6 @@ class ResultsView:
         if self.abs_radio.isChecked():
             return "abs_diff"
         elif self.std_radio.isChecked():
-            return "std"
+            return "SEM"
         elif self.binary_radio.isChecked():
             return "binary"
