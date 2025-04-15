@@ -1,4 +1,5 @@
 import warnings
+
 warnings.filterwarnings("ignore", category=FutureWarning)
 import sys
 import random
@@ -30,8 +31,11 @@ from misc.profiling import ProfileContext
 import gc
 import os
 
-
 default_path = "C:\\Users\\VisLab\\bin\\mika\\data\\Glycerol_5_10_20_30_40\\images"
+
+# default_path = (
+#     "/media/sd/mika/data/LED/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
+# )
 
 
 class MainWindow(QMainWindow):
@@ -185,7 +189,7 @@ class MainWindow(QMainWindow):
         # sidebar_layout.addLayout(self.extinction_ui.button_layout)
         sidebar_layout.addWidget(self.extinction_ui.reg_selection_group_box)
         sidebar_layout.addWidget(self.extinction_ui.metric_selection_group_box)
-        sidebar_layout.addWidget(self.time_series.time_controls_widget)
+        sidebar_layout.addWidget(self.time_series.time_controls_group_box)
 
         # Add export section to the sidebar layout
         export_layout = QVBoxLayout()
@@ -235,7 +239,9 @@ class MainWindow(QMainWindow):
         if checked:
             # Update the denoising method based on the checked button
             self.mean_method = next(
-                method for method, button in self.mean_buttons.items() if button.isChecked()
+                method
+                for method, button in self.mean_buttons.items()
+                if button.isChecked()
             )
 
             # Call the compute extinction method

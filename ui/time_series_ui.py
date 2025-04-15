@@ -6,11 +6,11 @@ import csv
 from PySide6.QtGui import QColor
 
 from PySide6.QtWidgets import (
-    QWidget,
     QHBoxLayout,
-    QDoubleSpinBox,
+    QSpinBox,
     QLabel,
     QFileDialog,
+    QGroupBox,
 )
 
 from misc.colors import color_palette, time_color_palette
@@ -28,7 +28,7 @@ class TimeSeries:
         self.time_labels = None
         self.group_labels = None
         self.curves = None
-        self.time_controls_widget = QWidget()
+        self.time_controls_group_box = QGroupBox("Time Range Selection")
 
     def cleanup(self):
         """
@@ -123,10 +123,10 @@ class TimeSeries:
         self.time_region2.setRegion((mid_x, self.max_x))
 
         # Create spinboxes
-        self.spinbox_region1_start = QDoubleSpinBox()
-        self.spinbox_region1_end = QDoubleSpinBox()
-        self.spinbox_region2_start = QDoubleSpinBox()
-        self.spinbox_region2_end = QDoubleSpinBox()
+        self.spinbox_region1_start = QSpinBox()
+        self.spinbox_region1_end = QSpinBox()
+        self.spinbox_region2_start = QSpinBox()
+        self.spinbox_region2_end = QSpinBox()
 
         for sb in [
             self.spinbox_region1_start,
@@ -135,8 +135,7 @@ class TimeSeries:
             self.spinbox_region2_end,
         ]:
             sb.setRange(self.min_x, self.max_x)
-            sb.setDecimals(2)
-            sb.setSingleStep(0.1)
+            sb.setSingleStep(1)
 
         # Set initial values
         self.spinbox_region1_start.setValue(self.min_x)
@@ -153,7 +152,7 @@ class TimeSeries:
         spinbox_layout.addWidget(self.spinbox_region2_start)
         spinbox_layout.addWidget(self.spinbox_region2_end)
 
-        self.time_controls_widget.setLayout(spinbox_layout)
+        self.time_controls_group_box.setLayout(spinbox_layout)
         # self.parent.layout().addWidget(self.time_controls_widget)  # Add to your UI layout
 
         # Connect spinbox -> region
