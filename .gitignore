@@ -6,3 +6,4 @@ export
 ui/examples_pyqtgraph.py
 *.png
 *.csv
+data

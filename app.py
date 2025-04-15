@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
 import sys
 import random
 
@@ -28,9 +30,8 @@ from misc.profiling import ProfileContext
 import gc
 import os
 
-default_path = (
-    "/media/sd/mika/data/LED/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
-)
+
+default_path = "C:\\Users\\VisLab\\bin\\mika\\data\\Glycerol_5_10_20_30_40\\images"
 
 
 class MainWindow(QMainWindow):
@@ -123,6 +124,9 @@ class MainWindow(QMainWindow):
         pipeline_button_layout.addWidget(self.spot_detection_layer_button)
         pipeline_button_layout.addWidget(self.analysis_layer_button)
         pipeline_button_layout.addWidget(self.results_layer_button)
+
+        sidebar_layout.addWidget(self.extinction_ui.extinction_display_group_box)
+        sidebar_layout.addWidget(self.extinction_ui.group_averaging_group_box)
         # Denoising buttons
         mean_layout = QFormLayout()
         mean_group_box = QGroupBox("Mean computation", self)
@@ -144,7 +148,7 @@ class MainWindow(QMainWindow):
         # Add buttons to the layout and connect their toggled signals to a single method
         for method, button in self.mean_buttons.items():
             mean_layout.addWidget(button)
-            button.toggled.connect(self.set_mean_method)
+            button.toggled[bool].connect(self.set_mean_method)
 
         # Add the denoising group box to the sidebar layout
         sidebar_layout.addWidget(mean_group_box)
@@ -226,24 +230,25 @@ class MainWindow(QMainWindow):
         self.results_view.draw()
         self.pipeline_stack_layout.setCurrentIndex(2)
 
-    def set_mean_method(self):
-        # Update the denoising method based on the checked button
-        self.mean_method = next(
-            method for method, button in self.mean_buttons.items() if button.isChecked()
-        )
+    def set_mean_method(self, checked: bool):
+        if checked:
+            # Update the denoising method based on the checked button
+            self.mean_method = next(
+                method for method, button in self.mean_buttons.items() if button.isChecked()
+            )
 
-        # Call the compute extinction method
+            # Call the compute extinction method
 
-        if self.pipeline_stack_layout.currentIndex() == 1:
-            self.extinction_ui.computeEverything()
-            self.extinction_ui.updateDataPoints()
-            self.extinction_ui.updateCurvesData()
-            self.time_series.updateCurveData()
-            means, stds = self.extinction_ui.get_statistics()
-            group_labels = self.extinction_ui.get_groups()
-            self.statistics_view.init_groups(means, stds, group_labels)
-        else:
-            self.spot_ui.circles.compute_extinction()
+            if self.pipeline_stack_layout.currentIndex() == 1:
+                self.extinction_ui.computeEverything()
+                self.extinction_ui.updateDataPoints()
+                self.extinction_ui.updateCurvesData()
+                self.time_series.updateCurveData()
+                means, stds = self.extinction_ui.get_statistics()
+                group_labels = self.extinction_ui.get_groups()
+                self.statistics_view.init_groups(means, stds, group_labels)
+            else:
+                self.spot_ui.circles.compute_extinction()
 
     def set_denoising_method(self):
         # Update the denoising method based on the checked button

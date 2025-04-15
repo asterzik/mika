@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QGraphicsView,
     QGraphicsScene,
     QGraphicsPixmapItem,
+    QToolBox
 )
 from PySide6.QtGui import (
     QAction,
@@ -363,7 +364,7 @@ class SpotDetectionUi:
 
         self.hough_dp_label = QLabel("dp")
         self.hough_dp_param = QDoubleSpinBox()
-        self.hough_dp_param.setValue(0.9)
+        self.hough_dp_param.setValue(1.2)
         self.hough_dp_param.setSingleStep(0.1)
 
         self.hough_min_dist_label = QLabel("Min Dist")
@@ -384,12 +385,12 @@ class SpotDetectionUi:
 
         self.hough_min_radius_label = QLabel("Min Radius")
         self.hough_min_radius_param = QSpinBox()
-        self.hough_min_radius_param.setValue(10)
+        self.hough_min_radius_param.setValue(8)
         self.hough_min_radius_param.setSingleStep(1)
 
         self.hough_max_radius_label = QLabel("Max Radius")
         self.hough_max_radius_param = QSpinBox()
-        self.hough_max_radius_param.setValue(15)
+        self.hough_max_radius_param.setValue(10)
         self.hough_max_radius_param.setSingleStep(1)
 
     def createSpotPushButtons(self):
@@ -503,7 +504,8 @@ class SpotDetectionUi:
 
     def createLayout(self):
         # Create a group box for Hough Parameters
-        hough_group_box = QGroupBox("Hough Parameters")
+        hough_group_box = QGroupBox()
+        # Make the group box checkable (this allows expanding and collapsing)
         hough_layout = QFormLayout()
 
         # Add Hough Parameters widgets
@@ -518,17 +520,17 @@ class SpotDetectionUi:
 
         # Add Push buttons button
         hough_layout.addWidget(self.detect_circles_button)
-        hough_layout.addWidget(self.calculate_extinction_button)
-        hough_layout.addWidget(self.deselect_spots_button)
+        #hough_layout.addWidget(self.calculate_extinction_button)
+        #hough_layout.addWidget(self.deselect_spots_button)
 
         # Add Hough Parameters group box and Detect Circles button to the main layout
-        self.side_bar_layout.addWidget(hough_group_box)
+
 
         # Create spot labeling group box
-        spot_labeling_box = QGroupBox("Spot Labeling")
+        spot_labeling_box = QGroupBox()
         self.spot_label_layout = QVBoxLayout()
         spot_labeling_box.setLayout(self.spot_label_layout)
-        self.side_bar_layout.addWidget(spot_labeling_box)
+        #self.side_bar_layout.addWidget(spot_labeling_box)
 
         self.create_spot_selection_buttons()
 
@@ -551,7 +553,7 @@ class SpotDetectionUi:
 
         self.extinction_boundary_buttons()
         # Create a group box for extinction boundaries
-        extinction_boundaries_box = QGroupBox("Extinction Boundaries")
+        extinction_boundaries_box = QGroupBox()
         extinction_layout = QFormLayout()
 
         # Add extinction boundaries widgets
@@ -565,13 +567,26 @@ class SpotDetectionUi:
         extinction_layout.addWidget(self.update_button)
 
         extinction_boundaries_box.setLayout(extinction_layout)
-        self.side_bar_layout.addWidget(extinction_boundaries_box)
+        #self.side_bar_layout.addWidget(extinction_boundaries_box)
         # Create a histogram plot using pyqtgraph
         self.hist_widget = pg.PlotWidget(background="w")
         self.hist_widget.setTitle(
             title="Foreground and Background Histogram", color="black"
         )
-        self.side_bar_layout.addWidget(self.hist_widget)
+   
+
+        toolbox = QToolBox()
+        toolbox.addItem(hough_group_box, "Hough Parameters")
+        toolbox.addItem(spot_labeling_box, "Spot Labeling")
+        toolbox.addItem(extinction_boundaries_box, "Extinction Boundaries")
+
+
+    
+
+        self.side_bar_layout.addWidget(toolbox, stretch = 1)
+                
+                
+        self.side_bar_layout.addWidget(self.hist_widget, stretch = 1)
 
     def addGroup(self):
         self.group_count += 1

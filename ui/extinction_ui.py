@@ -16,6 +16,7 @@ import pyqtgraph as pg
 import numpy as np
 import csv
 import os
+import time
 
 from enum import Enum
 
@@ -23,6 +24,7 @@ from line_fitting.line_fitting import No_Reg, Polynomial, GPRegression
 from misc.colors import color_palette
 from misc.profiling import ProfileContext
 import multiprocessing as mp
+from multiprocessing.pool import ThreadPool
 
 from enum import Enum
 import gc
@@ -60,11 +62,11 @@ class ExtinctionUi:
         self.plot_widget = pg.PlotWidget()
         self.layout.addWidget(self.plot_widget)
         self.button_layout = QVBoxLayout()
-        self.selection_layout = QVBoxLayout()
-        self.layout.addLayout(self.selection_layout)
+        #self.selection_layout = QVBoxLayout()
+        #self.layout.addLayout(self.selection_layout)
         self.extinction_display_options()
         self.group_averaging_options()
-        self.selection_layout.addStretch()
+        #self.selection_layout.addStretch()
         self.plot_widget.setBackground("w")
         self.plot_widget.setTitle("Extinction", color="black")
         self.spot_labels = None
@@ -144,10 +146,10 @@ class ExtinctionUi:
         self.regression(self.average_first_radio.isChecked())
 
     def extinction_display_options(self):
-        group_box = QGroupBox("Extinction Display")
+        self.extinction_display_group_box = QGroupBox("Extinction Display")
         group_layout = QVBoxLayout()
-        group_box.setLayout(group_layout)
-        self.selection_layout.addWidget(group_box)
+        self.extinction_display_group_box.setLayout(group_layout)
+        #self.selection_layout.addWidget(group_box)
 
         self.raw_data_checkbox = QCheckBox("Raw Data")
         self.raw_data_checkbox.setChecked(False)
@@ -165,10 +167,10 @@ class ExtinctionUi:
         self.average_time_checkbox.toggled.connect(self.toggle_time_average)
 
     def group_averaging_options(self):
-        group_box = QGroupBox("Group Averaging")
+        self.group_averaging_group_box = QGroupBox("Group Averaging")
         group_layout = QVBoxLayout()
-        group_box.setLayout(group_layout)
-        self.selection_layout.addWidget(group_box)
+        self.group_averaging_group_box.setLayout(group_layout)
+        #self.selection_layout.addWidget(group_box)
 
         self.average_first_radio = QRadioButton("Average extinction data")
         self.average_later_radio = QRadioButton("Average calculated metric")
@@ -251,9 +253,9 @@ class ExtinctionUi:
 
         group_layout.addWidget(self.max_radio)
         group_layout.addWidget(self.centroid_radio)
-        group_layout.addWidget(self.centroid_left_bound_radio)
-        group_layout.addWidget(self.centroid_half_height_radio)
-        group_layout.addWidget(self.centroid_left_bound_half_height_radio)
+        #group_layout.addWidget(self.centroid_left_bound_radio)
+        #group_layout.addWidget(self.centroid_half_height_radio)
+        #group_layout.addWidget(self.centroid_left_bound_half_height_radio)
         group_layout.addWidget(self.inflection_radio)
         # group_layout.addWidget(self.cross_correlation_radio)
 
@@ -484,7 +486,11 @@ class ExtinctionUi:
             for frame in range(self.num_time_steps)
             for index in range(self.num_groups if average_first else self.num_spots)
         ]
-        results = pool.starmap(individualRegression, mp_inputs)
+
+        t0 = time.time()
+        with ThreadPool(processes = 4) as pool:
+            results = pool.starmap(individualRegression, mp_inputs)
+        print(f"Extinction multiprocess {time.time() - t0:.2f} seconds")
         pool.close()
         pool.join()
 
