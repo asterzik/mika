@@ -3,6 +3,7 @@ import numpy as np
 from scipy import stats
 import os
 import multiprocessing as mp
+from multiprocessing.pool import ThreadPool
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtCore import QRect
@@ -11,6 +12,8 @@ import cProfile
 import pstats
 from image_processing.hyspectral_images import denoise_hsi_images
 import re
+import time
+
 
 
 # TODO make that changeable in the GUI
@@ -605,12 +608,12 @@ class Circles:
                 self.parent.inner_radius_param.value(),
                 self.shifts[np.unique(self.wavelengths).tolist().index(wl)],
             )
-            for image, wl in zip(self.images, self.wavelengths, strict=True)
+            for image, wl in zip(self.images, self.wavelengths, strict = True)
         ]
-        results = pool.starmap(
-            compute_fore_back_ground_per_image,
-            mp_inputs,
-        )
+        t0 = time.time()
+        with ThreadPool(processes=4) as pool:
+            results = pool.starmap(compute_fore_back_ground_per_image, mp_inputs)
+        print(f"Multiprocessing (starmap) took {time.time() - t0:.2f} seconds")
         pool.close()
         pool.join()
         self.foreground, self.background = zip(*results)
