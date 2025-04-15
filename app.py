@@ -181,6 +181,7 @@ class MainWindow(QMainWindow):
         # sidebar_layout.addLayout(self.extinction_ui.button_layout)
         sidebar_layout.addWidget(self.extinction_ui.reg_selection_group_box)
         sidebar_layout.addWidget(self.extinction_ui.metric_selection_group_box)
+        sidebar_layout.addWidget(self.time_series.time_controls_widget)
 
         # Add export section to the sidebar layout
         export_layout = QVBoxLayout()
