@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QLabel,
     QSpinBox,
+    QSizePolicy,
 )
 from PySide6.QtGui import QColor
 import pyqtgraph as pg
@@ -60,6 +61,7 @@ class ExtinctionUi:
         self.widget = QWidget()
         self.layout = QHBoxLayout()
         self.plot_widget = pg.PlotWidget()
+        self.plot_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.layout.addWidget(self.plot_widget)
         self.button_layout = QVBoxLayout()
         #self.selection_layout = QVBoxLayout()

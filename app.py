@@ -192,7 +192,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(self.time_series.time_controls_group_box)
 
         # Add export section to the sidebar layout
-        export_layout = QVBoxLayout()
+        export_layout = QHBoxLayout()
         export_group_box = QGroupBox("Export Data", self)
         export_group_box.setLayout(export_layout)
 

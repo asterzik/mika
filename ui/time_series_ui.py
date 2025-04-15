@@ -7,10 +7,12 @@ from PySide6.QtGui import QColor
 
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QVBoxLayout,
     QSpinBox,
     QLabel,
     QFileDialog,
     QGroupBox,
+    QSizePolicy
 )
 
 from misc.colors import color_palette, time_color_palette
@@ -20,6 +22,7 @@ class TimeSeries:
     def __init__(self, parent=None):
         self.parent = parent
         self.widget = pg.PlotWidget()
+        self.widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.widget.setBackground("w")
         self.widget.setTitle("Sensorgram", color="black")
         self.x_values = None
@@ -144,13 +147,17 @@ class TimeSeries:
         self.spinbox_region2_end.setValue(self.max_x)
 
         # Layout the spinboxes somewhere in your UI
-        spinbox_layout = QHBoxLayout()
-        spinbox_layout.addWidget(QLabel("Range 1:"))
-        spinbox_layout.addWidget(self.spinbox_region1_start)
-        spinbox_layout.addWidget(self.spinbox_region1_end)
-        spinbox_layout.addWidget(QLabel("Range 2:"))
-        spinbox_layout.addWidget(self.spinbox_region2_start)
-        spinbox_layout.addWidget(self.spinbox_region2_end)
+        spinbox_layout = QVBoxLayout()
+        s1_layout = QHBoxLayout()
+        s2_layout = QHBoxLayout()
+        s1_layout.addWidget(QLabel("Range 1:"))
+        s1_layout.addWidget(self.spinbox_region1_start)
+        s1_layout.addWidget(self.spinbox_region1_end)
+        s2_layout.addWidget(QLabel("Range 2:"))
+        s2_layout.addWidget(self.spinbox_region2_start)
+        s2_layout.addWidget(self.spinbox_region2_end)
+        spinbox_layout.addLayout(s1_layout)
+        spinbox_layout.addLayout(s2_layout)
 
         self.time_controls_group_box.setLayout(spinbox_layout)
         # self.parent.layout().addWidget(self.time_controls_widget)  # Add to your UI layout
