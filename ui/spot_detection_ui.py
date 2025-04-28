@@ -577,7 +577,24 @@ class SpotDetectionUi:
 
         self.hist_widget.setLabel("left", "Counts")  # Y-axis
         self.hist_widget.setLabel("bottom", "Intensity", units="a.u.")  # X-axis
+        # Create the legend
+        self.legend = self.hist_widget.addLegend(
+            offset=(0, 1), brush="white", pen="lightgray", labelTextColor="black"
+        )
 
+        # Create invisible plot items for the colors
+        brush0 = pg.mkBrush((*time_color_palette[0], 200))
+        brush1 = pg.mkBrush((*time_color_palette[1], 200))
+        self.inner_radius_item = pg.ScatterPlotItem(
+            [], [], pen=None, symbol="o", brush=brush0, size=10
+        )
+        self.outer_radius_item = pg.ScatterPlotItem(
+            [], [], pen=None, symbol="o", brush=brush1, size=10
+        )
+
+        # Add the items to the legend with corresponding labels
+        self.legend.addItem(self.inner_radius_item, "Inner Circle")
+        self.legend.addItem(self.outer_radius_item, "Outer Ring")
         toolbox = QToolBox()
         toolbox.addItem(hough_group_box, "Hough Parameters")
         toolbox.addItem(spot_labeling_box, "Spot Labeling")
