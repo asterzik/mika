@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QGraphicsView,
     QGraphicsScene,
     QGraphicsPixmapItem,
-    QToolBox
+    QToolBox,
 )
 from PySide6.QtGui import (
     QAction,
@@ -520,17 +520,16 @@ class SpotDetectionUi:
 
         # Add Push buttons button
         hough_layout.addWidget(self.detect_circles_button)
-        #hough_layout.addWidget(self.calculate_extinction_button)
-        #hough_layout.addWidget(self.deselect_spots_button)
+        # hough_layout.addWidget(self.calculate_extinction_button)
+        # hough_layout.addWidget(self.deselect_spots_button)
 
         # Add Hough Parameters group box and Detect Circles button to the main layout
-
 
         # Create spot labeling group box
         spot_labeling_box = QGroupBox()
         self.spot_label_layout = QVBoxLayout()
         spot_labeling_box.setLayout(self.spot_label_layout)
-        #self.side_bar_layout.addWidget(spot_labeling_box)
+        # self.side_bar_layout.addWidget(spot_labeling_box)
 
         self.create_spot_selection_buttons()
 
@@ -567,26 +566,21 @@ class SpotDetectionUi:
         extinction_layout.addWidget(self.update_button)
 
         extinction_boundaries_box.setLayout(extinction_layout)
-        #self.side_bar_layout.addWidget(extinction_boundaries_box)
+        # self.side_bar_layout.addWidget(extinction_boundaries_box)
         # Create a histogram plot using pyqtgraph
         self.hist_widget = pg.PlotWidget(background="w")
         self.hist_widget.setTitle(
             title="Foreground and Background Histogram", color="black"
         )
-   
 
         toolbox = QToolBox()
         toolbox.addItem(hough_group_box, "Hough Parameters")
         toolbox.addItem(spot_labeling_box, "Spot Labeling")
         toolbox.addItem(extinction_boundaries_box, "Extinction Boundaries")
 
+        self.side_bar_layout.addWidget(toolbox, stretch=1)
 
-    
-
-        self.side_bar_layout.addWidget(toolbox, stretch = 1)
-                
-                
-        self.side_bar_layout.addWidget(self.hist_widget, stretch = 1)
+        self.side_bar_layout.addWidget(self.hist_widget, stretch=1)
 
     def addGroup(self):
         self.group_count += 1
@@ -687,6 +681,7 @@ class SpotDetectionUi:
         self.circles.draw_circles()
 
     def spot_detection_tool_toggled(self, action):
+        self.deselectSpots()
         self.start_point = None
         """ Custom logic to allow unchecking an action when clicked again """
         if self.current_action == action:
@@ -700,6 +695,7 @@ class SpotDetectionUi:
 
             self.current_action = action
             action.setChecked(True)
+        self.deselectSpots()
 
     def add_or_remove_circle(self, x, y):
         pixmap = self.circles.add_or_remove_circle(x, y)
