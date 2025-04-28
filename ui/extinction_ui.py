@@ -71,6 +71,8 @@ class ExtinctionUi:
         # self.selection_layout.addStretch()
         self.plot_widget.setBackground("w")
         self.plot_widget.setTitle("Extinction", color="black")
+        self.plot_widget.setLabel("left", "Extinction (a.u.)")
+        self.plot_widget.setLabel("bottom", "Wavelength", units="nm")
         self.spot_labels = None
         self.time_indices = None
         self.time_labels = None

@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QFileDialog,
     QGroupBox,
-    QSizePolicy
+    QSizePolicy,
 )
 
 from misc.colors import color_palette, time_color_palette
@@ -25,6 +25,8 @@ class TimeSeries:
         self.widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.widget.setBackground("w")
         self.widget.setTitle("Sensorgram", color="black")
+        self.widget.setLabel("left", "Extracted Wavelength", units="nm")
+        self.widget.setLabel("bottom", "Frame Index")
         self.x_values = None
         self.y_values = None
         self.time_indices = None

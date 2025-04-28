@@ -573,6 +573,9 @@ class SpotDetectionUi:
             title="Foreground and Background Histogram", color="black"
         )
 
+        self.hist_widget.setLabel("left", "Counts")  # Y-axis
+        self.hist_widget.setLabel("bottom", "Intensity", units="a.u.")  # X-axis
+
         toolbox = QToolBox()
         toolbox.addItem(hough_group_box, "Hough Parameters")
         toolbox.addItem(spot_labeling_box, "Spot Labeling")
