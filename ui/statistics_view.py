@@ -34,6 +34,7 @@ class StatisticsView(QWidget):
         self.layout.addWidget(title_label)
         for i, label in enumerate(group_labels):
             group_name = f"Group {label+1}"
+            group_name = self.parent.spot_ui.group_names[label]
             mean = means[:, i]
             std = stds[:, i]
             frame = self.create_stat_frame(group_name, label, mean, std, i)

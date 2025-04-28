@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QGraphicsScene,
     QGraphicsPixmapItem,
     QToolBox,
+    QLineEdit,
 )
 from PySide6.QtGui import (
     QAction,
@@ -228,6 +229,7 @@ class SpotDetectionUi:
         self.layout = QVBoxLayout()  # Create a QVBoxLayout for self.widget
         self.widget.setLayout(self.layout)  # Set the layout for self.widget
         self.inner_widget = QWidget()
+        self.group_names = []
         self.createActions()
         self.createToolbar()
         self.layout.addWidget(self.inner_widget)
@@ -588,9 +590,9 @@ class SpotDetectionUi:
     def addGroup(self):
         self.group_count += 1
         group_name = f"Group {self.group_count}"
+        self.group_names.append(group_name)
         index = self.group_count - 1
 
-        # Cycle through the colors if more than the predefined colors are used
         color = color_palette[(index) % len(color_palette)]
         color_string = f"rgb({color[0]}, {color[1]}, {color[2]})"
 
@@ -603,19 +605,51 @@ class SpotDetectionUi:
                 border-radius: 5px;
                 padding: 5px;
             }}
-        """
+            """
         )
         new_radio_button.setProperty("index", index)
         new_radio_button.toggled.connect(self.setCurrentGroup)
         new_radio_button.setChecked(True)
         self.spot_labels.addButton(new_radio_button)
 
+        # Create the QLineEdit for group name editing
+        group_name_input = QLineEdit(group_name)
+        group_name_input.setStyleSheet("padding: 5px;")
+        group_name_input.setMaxLength(30)  # Optional: Limit length of name
+        group_name_input.setVisible(False)  # Initially hidden
+
+        # Function to toggle between radio button and QLineEdit
+        def on_radio_button_double_clicked():
+            # Show the QLineEdit when double-clicked
+            group_name_input.setVisible(True)
+            # group_name_input.setFocus()  # Focus on the input field
+            new_radio_button.setVisible(False)  # Hide the radio button
+
+        # Update the radio button text when user presses Enter or loses focus
+        def on_editing_finished():
+            new_group_name = group_name_input.text()
+            new_radio_button.setVisible(True)  # Make radio button visible again
+            group_name_input.setVisible(False)  # Hide QLineEdit
+            new_radio_button.setText(new_group_name)
+            self.group_names[new_radio_button.property("index")] = new_group_name
+
+        # Connect the signals
+        new_radio_button.mouseDoubleClickEvent = (
+            lambda event: on_radio_button_double_clicked()
+        )
+        group_name_input.returnPressed.connect(on_editing_finished)
+        # group_name_input.editingFinished.connect(on_editing_finished)
+
+        # Create a layout for the radio button and input field (side by side)
+        group_layout = QHBoxLayout()
+        group_layout.addWidget(new_radio_button)
+        group_layout.addWidget(group_name_input)
+
         # Ensure that the spacer is always the last item in the group
         self.spot_label_layout.removeItem(self.spacer)
 
-        # Add the new radio button to the layout and store it
-        self.spot_label_layout.addWidget(new_radio_button)
-
+        # Add the new group layout and store it
+        self.spot_label_layout.addLayout(group_layout)
         self.spot_label_layout.addSpacerItem(self.spacer)
 
     def setCurrentGroup(self):
