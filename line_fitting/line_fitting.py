@@ -2,7 +2,8 @@ import numpy as np
 import warnings
 from scipy.optimize import minimize_scalar
 from scipy.integrate import quad
-#from scipy.misc import derivative
+
+# from scipy.misc import derivative
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import (
     RBF,
@@ -204,7 +205,8 @@ class No_Reg(Regressor):
 
     def full_centroid(self):
         centroid = np.sum(self.x * self.y) / np.sum(self.y)
-        return centroid, 0
+        centroid_y = np.sum(self.y * self.x) / np.sum(self.x)
+        return centroid, centroid_y
 
     def bounded_centroid(self, bound):
         raise NotImplementedError("Bounded centroid not implemented for No_Reg")
