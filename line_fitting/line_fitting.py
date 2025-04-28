@@ -2,7 +2,7 @@ import numpy as np
 import warnings
 from scipy.optimize import minimize_scalar
 from scipy.integrate import quad
-from scipy.misc import derivative
+#from scipy.misc import derivative
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import (
     RBF,
@@ -163,7 +163,7 @@ class GPRegression(Regressor):
         return y_pred
 
     def second_derivative(self, x):
-        return derivative(self.predict, x, dx=1e-6, n=2)
+        return scipy.derivative(self.predict, x, dx=1e-6, n=2)
 
 
 class No_Reg(Regressor):

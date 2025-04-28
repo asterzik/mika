@@ -10,10 +10,11 @@ from PySide6.QtCore import QRect
 from statsmodels.robust.scale import huber
 import cProfile
 import pstats
-from image_processing.hyspectral_images import denoise_hsi_images
+#from image_processing.hyspectral_images import denoise_hsi_images
 import re
 import time
 
+import math
 
 
 # TODO make that changeable in the GUI
@@ -63,10 +64,11 @@ def compute_fore_back_ground_per_image(
 ):
     average_foreground = []
     average_background = []
+
     for pt in selected_circles:
-        a, b, r = pt[0], pt[1], pt[2]
+        a, b, r = int(pt[0]), int(pt[1]), int(pt[2])
         a += int(round(shift[0]))
-        b += int(round(shift[1]))
+        b += int(round(shift[0]))
 
         # Calculate mean background intensity
         grayscale_image = image[:, :, 0]
@@ -299,10 +301,10 @@ class Circles:
             sorted_images = [img for _, img, _ in images_with_wavelengths]
 
             # # Denoise the sorted images
-            if denoising_method == "None":
-                smoothed_images = sorted_images
-            else:
-                smoothed_images = denoise_hsi_images(sorted_images, denoising_method)
+            #if denoising_method == "None":
+            smoothed_images = sorted_images
+           # else:
+            #   smoothed_images = denoise_hsi_images(sorted_images, denoising_method)
 
             # Convert each denoised grayscale image to RGB and append it to self.images
             for i, (wavelength, image, image_name) in enumerate(

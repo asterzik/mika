@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QLabel,
     QSpinBox,
+    QSizePolicy,
 )
 from PySide6.QtGui import QColor
 import pyqtgraph as pg
@@ -60,6 +61,7 @@ class ExtinctionUi:
         self.widget = QWidget()
         self.layout = QHBoxLayout()
         self.plot_widget = pg.PlotWidget()
+        self.plot_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.layout.addWidget(self.plot_widget)
         self.button_layout = QVBoxLayout()
         #self.selection_layout = QVBoxLayout()
@@ -667,7 +669,11 @@ class ExtinctionUi:
             .flatten()
         )
         y_vals = self.extinction.flatten()
-        self.scatter_data_points.setData(x=x_vals, y=y_vals)
+        labels = self.selected_spot_labels[0]
+        colors = []
+        for label in labels:
+            colors.extend(QColor(*color_palette[label]))
+        self.scatter_data_points.setData(x=x_vals, y=y_vals, brush = colors)
         if not self.raw_data_checkbox.isChecked():
             self.scatter_data_points.setVisible(False)
 
