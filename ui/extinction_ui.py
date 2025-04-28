@@ -669,7 +669,11 @@ class ExtinctionUi:
             .flatten()
         )
         y_vals = self.extinction.flatten()
-        self.scatter_data_points.setData(x=x_vals, y=y_vals)
+        labels = self.selected_spot_labels[0]
+        colors = []
+        for label in labels:
+            colors.extend(QColor(*color_palette[label]))
+        self.scatter_data_points.setData(x=x_vals, y=y_vals, brush = colors)
         if not self.raw_data_checkbox.isChecked():
             self.scatter_data_points.setVisible(False)
 
