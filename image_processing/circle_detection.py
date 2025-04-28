@@ -10,7 +10,8 @@ from PySide6.QtCore import QRect
 from statsmodels.robust.scale import huber
 import cProfile
 import pstats
-#from image_processing.hyspectral_images import denoise_hsi_images
+
+# from image_processing.hyspectral_images import denoise_hsi_images
 import re
 import time
 
@@ -301,9 +302,9 @@ class Circles:
             sorted_images = [img for _, img, _ in images_with_wavelengths]
 
             # # Denoise the sorted images
-            #if denoising_method == "None":
+            # if denoising_method == "None":
             smoothed_images = sorted_images
-           # else:
+            # else:
             #   smoothed_images = denoise_hsi_images(sorted_images, denoising_method)
 
             # Convert each denoised grayscale image to RGB and append it to self.images
@@ -544,8 +545,11 @@ class Circles:
                 (closest_x - circles[:, 0]) ** 2 + (closest_y - circles[:, 1]) ** 2
             )
 
-            # Check which circles overlap with the rectangle
-            overlap_indices = np.where(distances <= circles[:, 2])[0]
+            # # Check which circles overlap with the rectangle
+            # overlap_indices = np.where(distances <= circles[:, 2])[0]
+            # Check where the center of the circlesw overlaps with the rectangle
+
+            overlap_indices = np.where(distances <= 0)[0]
 
             preselected = np.where(np.isin(self.selected_spots, overlap_indices))[0]
 
@@ -610,7 +614,7 @@ class Circles:
                 self.parent.inner_radius_param.value(),
                 self.shifts[np.unique(self.wavelengths).tolist().index(wl)],
             )
-            for image, wl in zip(self.images, self.wavelengths, strict = True)
+            for image, wl in zip(self.images, self.wavelengths, strict=True)
         ]
         t0 = time.time()
         with ThreadPool(processes=4) as pool:
