@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QGraphicsScene,
     QGraphicsPixmapItem,
     QFileDialog,
+    QComboBox,
 )
 from PySide6.QtCore import Qt
 
@@ -156,31 +157,31 @@ class SpotSelectionUi:
 
         wavelength_group = QGroupBox("Wavelength")
         wavelength_group_layout = QVBoxLayout()
-        self.wl_spin_box = QSpinBox()
-        wavelengths = self.circles.get_wavelengths()
-        self.wl_spin_box.setRange(wavelengths[0], wavelengths[len(wavelengths) - 1])
-        # TODO: change selection method if the distances between the wavelengths aren't always the same
-        step_size = wavelengths[1] - wavelengths[0]
-        self.wl_spin_box.setSingleStep(step_size)
+
+        self.wavelengths = self.circles.get_wavelengths()
+        self.wl_combo_box = QComboBox()
+        for wl in self.wavelengths:
+            self.wl_combo_box.addItem(f"{wl} nm")  # nicely formatted
+
         self.wl_slider = QSlider(Qt.Horizontal)
-        self.wl_slider.setRange(0, len(wavelengths) - 1)
+        self.wl_slider.setRange(0, len(self.wavelengths) - 1)
         self.wl_slider.setSingleStep(1)
         self.wl_slider.setTickInterval(1)
         self.wl_slider.setTickPosition(QSlider.TicksBelow)
 
-        def update_wl_spinbox(value):
-            self.wl_spin_box.setValue(wavelengths[0] + value * step_size)
+        def update_wl_slider(index):
+            self.wl_slider.setValue(index)
             self.redrawImage()
 
-        def update_wl_slider(value):
-            self.wl_slider.setValue((value - wavelengths[0]) // step_size)
+        def update_wl_combobox(index):
+            self.wl_combo_box.setCurrentIndex(index)
             self.redrawImage()
 
         # Synchronize the spinbox and slider
-        self.wl_slider.valueChanged.connect(update_wl_spinbox)
-        self.wl_spin_box.valueChanged.connect(update_wl_slider)
+        self.wl_slider.valueChanged.connect(update_wl_combobox)
+        self.wl_combo_box.currentIndexChanged.connect(update_wl_slider)
 
-        wavelength_group_layout.addWidget(self.wl_spin_box)
+        wavelength_group_layout.addWidget(self.wl_combo_box)
         wavelength_group_layout.addWidget(self.wl_slider)
 
         wavelength_group.setLayout(wavelength_group_layout)
@@ -202,7 +203,8 @@ class SpotSelectionUi:
 
     def displaySelectedImage(self):
         frame = self.frame_spin_box.value()
-        wavelength = self.wl_spin_box.value()
+        wavelength_idx = self.wl_slider.value()
+        wavelength = self.wavelengths[wavelength_idx]
         pixmap = self.circles.get_image(wavelength, frame)
         shift = self.circles.get_shift(wavelength)
         self.parent.spot_ui.interactive_image.setPixmap(pixmap)
