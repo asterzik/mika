@@ -1,4 +1,28 @@
 - The wavelengths and frames are extracted from the image names. The pattern matching is done in the function load_images in image_processing/circle_detection.py
-It works for the data I have but might not work for your data. You can adjust it there.
 - If you want, you can set a default_path to an image folder that gets opened automatically upon startup in app.py, but this is not necessary
-- You can use the requirements.txt to install the necessary packages for this project to function (pip install -r requirements.txt)
+
+Project Setup
+1. Setting Up the Environment
+
+    Install Miniconda or Anaconda if you don’t have it already.
+
+    Clone or download this repository.
+
+    Create the environment by running:
+
+conda env create -f environment.yml
+
+Activate the environment:
+
+    conda activate mika
+
+2. CUDA-Enabled OpenCV (Optional for Speed)
+
+The environment provided uses CPU-only OpenCV by default. If you want to enable GPU acceleration with CUDA, you need to install cuda enabled opencv in the environment manually.
+
+To check if OpenCV is using CUDA, run the following in Python:
+
+import cv2
+print(cv2.getBuildInformation())
+
+Look for CUDA: YES in the output.
