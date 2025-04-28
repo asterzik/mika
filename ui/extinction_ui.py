@@ -64,11 +64,11 @@ class ExtinctionUi:
         self.plot_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.layout.addWidget(self.plot_widget)
         self.button_layout = QVBoxLayout()
-        #self.selection_layout = QVBoxLayout()
-        #self.layout.addLayout(self.selection_layout)
+        # self.selection_layout = QVBoxLayout()
+        # self.layout.addLayout(self.selection_layout)
         self.extinction_display_options()
         self.group_averaging_options()
-        #self.selection_layout.addStretch()
+        # self.selection_layout.addStretch()
         self.plot_widget.setBackground("w")
         self.plot_widget.setTitle("Extinction", color="black")
         self.spot_labels = None
@@ -151,7 +151,7 @@ class ExtinctionUi:
         self.extinction_display_group_box = QGroupBox("Extinction Display")
         group_layout = QVBoxLayout()
         self.extinction_display_group_box.setLayout(group_layout)
-        #self.selection_layout.addWidget(group_box)
+        # self.selection_layout.addWidget(group_box)
 
         self.raw_data_checkbox = QCheckBox("Raw Data")
         self.raw_data_checkbox.setChecked(False)
@@ -172,7 +172,7 @@ class ExtinctionUi:
         self.group_averaging_group_box = QGroupBox("Group Averaging")
         group_layout = QVBoxLayout()
         self.group_averaging_group_box.setLayout(group_layout)
-        #self.selection_layout.addWidget(group_box)
+        # self.selection_layout.addWidget(group_box)
 
         self.average_first_radio = QRadioButton("Average extinction data")
         self.average_later_radio = QRadioButton("Average calculated metric")
@@ -255,9 +255,9 @@ class ExtinctionUi:
 
         group_layout.addWidget(self.max_radio)
         group_layout.addWidget(self.centroid_radio)
-        #group_layout.addWidget(self.centroid_left_bound_radio)
-        #group_layout.addWidget(self.centroid_half_height_radio)
-        #group_layout.addWidget(self.centroid_left_bound_half_height_radio)
+        # group_layout.addWidget(self.centroid_left_bound_radio)
+        # group_layout.addWidget(self.centroid_half_height_radio)
+        # group_layout.addWidget(self.centroid_left_bound_half_height_radio)
         group_layout.addWidget(self.inflection_radio)
         # group_layout.addWidget(self.cross_correlation_radio)
 
@@ -490,7 +490,7 @@ class ExtinctionUi:
         ]
 
         t0 = time.time()
-        with ThreadPool(processes = 4) as pool:
+        with ThreadPool(processes=4) as pool:
             results = pool.starmap(individualRegression, mp_inputs)
         print(f"Extinction multiprocess {time.time() - t0:.2f} seconds")
         pool.close()
@@ -669,11 +669,13 @@ class ExtinctionUi:
             .flatten()
         )
         y_vals = self.extinction.flatten()
-        labels = self.selected_spot_labels[0]
+        labels = [inner_list[0] for inner_list in self.selected_spot_labels]
         colors = []
         for label in labels:
-            colors.extend(QColor(*color_palette[label]))
-        self.scatter_data_points.setData(x=x_vals, y=y_vals, brush = colors)
+            color = QColor(*color_palette[label])
+            colors.append(color)
+        large_color_array = np.tile(colors, np.prod(self.wavelengths.shape))
+        self.scatter_data_points.setData(x=x_vals, y=y_vals, brush=large_color_array)
         if not self.raw_data_checkbox.isChecked():
             self.scatter_data_points.setVisible(False)
 
