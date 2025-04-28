@@ -173,7 +173,7 @@ class ResultsView:
         self.color_mode_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
 
         self.abs_radio = QRadioButton("Abs. Difference")
-        self.std_radio = QRadioButton("Std. Deviation")
+        self.std_radio = QRadioButton("Std. Error (SEM)")
         self.binary_radio = QRadioButton("Binary Classification")
         self.abs_radio.setChecked(True)
 
