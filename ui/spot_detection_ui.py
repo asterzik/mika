@@ -139,7 +139,7 @@ class InteractiveImage(QGraphicsView):
         pen.setWidth(2)
         painter.setPen(pen)
         painter.drawLine(start_point, end_point)
-        painter.drawText(end_point, f"{round(measured_dist)} pixels")
+        # painter.drawText(end_point, f"{round(measured_dist)} pixels")
         painter.end()  # Finish painting
         self.setPixmap(pixmap)
 
