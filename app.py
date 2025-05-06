@@ -43,7 +43,8 @@ class MainWindow(QMainWindow):
     def __init__(self, path=None):
         super(MainWindow, self).__init__()
         self.setWindowTitle("MIKA")
-        self.showMaximized()
+        self.setFixedSize(1920, 1080)
+        # self.showMaximized()
 
         # Initialize variables for UI components (to be deleted later)
         self.spot_ui = None
@@ -158,30 +159,30 @@ class MainWindow(QMainWindow):
         # Add the denoising group box to the sidebar layout
         sidebar_layout.addWidget(mean_group_box)
 
-        denoising_layout = QFormLayout()
-        denoising_group_box = QGroupBox("Denoising", self)
-        denoising_group_box.setLayout(denoising_layout)
+        # denoising_layout = QFormLayout()
+        # denoising_group_box = QGroupBox("Denoising", self)
+        # denoising_group_box.setLayout(denoising_layout)
 
-        # Create a list of radio buttons with their corresponding labels
-        self.denoising_buttons = {
-            "None": QRadioButton("None", self),
-            "HyRes": QRadioButton("HyRes", self),
-            "HyMinor": QRadioButton("HyMinor", self),
-            "FastHyDe": QRadioButton("FastHyDe", self),
-            "L1HyMixDe": QRadioButton("L1HyMixDe", self),
-            "WSRRR": QRadioButton("WSRRR"),
-            "OTVCA": QRadioButton("OTVCA"),
-            "FORPDN": QRadioButton("FORPDN"),
-        }
+        # # Create a list of radio buttons with their corresponding labels
+        # self.denoising_buttons = {
+        #     "None": QRadioButton("None", self),
+        #     "HyRes": QRadioButton("HyRes", self),
+        #     "HyMinor": QRadioButton("HyMinor", self),
+        #     "FastHyDe": QRadioButton("FastHyDe", self),
+        #     "L1HyMixDe": QRadioButton("L1HyMixDe", self),
+        #     "WSRRR": QRadioButton("WSRRR"),
+        #     "OTVCA": QRadioButton("OTVCA"),
+        #     "FORPDN": QRadioButton("FORPDN"),
+        # }
 
-        # Set the default checked button
-        self.denoising_buttons["None"].setChecked(True)
-        self.denoising_method = "None"
+        # # Set the default checked button
+        # self.denoising_buttons["None"].setChecked(True)
+        # self.denoising_method = "None"
 
-        # Add buttons to the layout and connect their toggled signals to a single method
-        for method, button in self.denoising_buttons.items():
-            denoising_layout.addWidget(button)
-            button.toggled.connect(self.set_denoising_method)
+        # # Add buttons to the layout and connect their toggled signals to a single method
+        # for method, button in self.denoising_buttons.items():
+        #     denoising_layout.addWidget(button)
+        #     button.toggled.connect(self.set_denoising_method)
 
         # TODO: Really check out denoising options and make sure they work if they are to be selected in the framework
         # # Add the denoising group box to the sidebar layout
