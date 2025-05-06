@@ -22,7 +22,7 @@ class TimeSeries:
     def __init__(self, parent=None):
         self.parent = parent
         self.widget = pg.PlotWidget()
-        self.widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        # self.widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.widget.setBackground("w")
         self.widget.setTitle("Sensorgram", color="black")
         self.widget.setLabel("left", "Extracted Wavelength", units="nm")
