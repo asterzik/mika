@@ -295,7 +295,7 @@ class ResultsView:
             )
             self.ring_group.hide()
         elif self.binary_radio.isChecked():
-            self.value = self.diff > 3 * np.mean(self.diff_std)
+            self.value = (self.diff > (3 * self.diff_std))
             self.lower = 0
             self.upper = 1
             self.legend.updateBounds(False, True)
@@ -354,18 +354,18 @@ class ResultsView:
             )
             brush = QBrush(color)
             painter.setBrush(brush)
-            painter.drawEllipse(x - r, y - r, 2 * r, 2 * r)
+            painter.setPen(Qt.NoPen)
 
             if self.abs_radio.isChecked() and not self.no_ring_radio.isChecked():
                 if self.own_ring_radio.isChecked():
                     compare = std
                 elif self.mean_ring_radio.isChecked():
                     compare = np.mean(self.diff_std)
-                if value > 3 * compare:
+                if (value > 3 * compare):
                     ring_pen = QPen(Qt.black)
                     ring_pen.setWidth(2)
                     painter.setPen(ring_pen)
-                    painter.drawEllipse(x - r, y - r, 2 * r, 2 * r)
+            painter.drawEllipse(x - r, y - r, 2 * r, 2 * r)
 
         painter.end()  # Finish painting
 
