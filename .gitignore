@@ -7,3 +7,7 @@ ui/examples_pyqtgraph.py
 *.png
 *.csv
 data
+build
+app.spec
+dist
+dist.zip

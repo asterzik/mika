@@ -191,7 +191,6 @@ class TimeSeries:
         self.min_x = np.min(self.x_values)
         self.max_x = np.max(self.x_values)
         mid_x = (self.min_x + self.max_x) / 2
-        print(self.min_x, self.max_x, mid_x)
 
         # Set initial regions
         self.time_region1.setRegion((self.min_x, mid_x))
