@@ -142,8 +142,11 @@ class ExtinctionUi:
         gc.collect()
         self.computeExtinction()
         self.setAllIndices()
+        # TODO: Its not possible to set more groups than twice the number of spots.Probably not necessary but this should at least be checked properly
         if self.curves is None:
-            self.curves = np.empty((self.num_time_steps, self.num_spots), dtype=object)
+            self.curves = np.empty(
+                (self.num_time_steps, self.num_spots * 2), dtype=object
+            )
         self.generate_group_lists()
         if self.average_first_radio.isChecked():
             self.averageGroups()

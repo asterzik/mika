@@ -166,7 +166,8 @@ class TimeSeries:
         if self.time_indices is None:
             self.time_indices = np.array(range(len(self.x_values)))
             self.time_labels = np.zeros_like(self.time_indices)
-        self.max_num_groups = self.parent.extinction_ui.get_spot_count()
+        # TODO set maximum to two times spot count. Don't know if more would be necessary, check that
+        self.max_num_groups = 2 * self.parent.extinction_ui.get_spot_count()
         self.curves = np.empty(self.max_num_groups, dtype=object)
         # Retrieve time series data from extinction curves
 
