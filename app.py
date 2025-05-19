@@ -31,20 +31,20 @@ from misc.profiling import ProfileContext
 import gc
 import os
 
-default_path = "D:\\mika\\data\\LED\\Glycerol_5_10_20_30_40\\images"
+# default_path = "D:\\mika\\data\\LED\\Glycerol_5_10_20_30_40\\images"
 # default_path = "C:\\Users\\VisLab\\bin\\mika\\data\\Glycerol_5_10_20_30_40\\images"
 
-# default_path = (
-#     "/media/sd/mika/data/LED/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
-# )
+default_path = (
+    "/media/sd/mika/data/LED/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
+)
 
 
 class MainWindow(QMainWindow):
     def __init__(self, path=None):
         super(MainWindow, self).__init__()
         self.setWindowTitle("MIKA")
-        self.setFixedSize(1920, 1080)
-        # self.showMaximized()
+        # self.setFixedSize(1920, 1080)
+        self.showMaximized()
 
         # Initialize variables for UI components (to be deleted later)
         self.spot_ui = None
@@ -217,8 +217,8 @@ class MainWindow(QMainWindow):
             self.spot_ui.circles.select_all_spots(self.spot_ui.interactive_image)
         if self.spot_selection_changed:
             self.extinction_ui.computeEverything()
-            self.time_series.draw()
             self.extinction_ui.draw()
+            self.time_series.draw()
             means, stds = self.extinction_ui.get_statistics()
             group_labels = self.extinction_ui.get_groups()
             self.statistics_view.init_groups(means, stds, group_labels)

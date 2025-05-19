@@ -35,6 +35,92 @@ class TimeSeries:
         self.curves = None
         self.time_controls_group_box = QGroupBox("Time Range Selection")
 
+        # Add two time ranges for comparisons
+
+        color1 = QColor()
+        color1.setRgb(*time_color_palette[0])
+        color1.setAlpha(15)
+
+        color2 = QColor()
+        color2.setRgb(*time_color_palette[1])
+        color2.setAlpha(15)
+
+        self.time_region1 = pg.LinearRegionItem(
+            orientation="vertical", movable=True, brush=color1
+        )
+        self.time_region2 = pg.LinearRegionItem(
+            orientation="vertical", movable=True, brush=color2
+        )
+
+        # Create spinboxes
+        self.spinbox_region1_start = QSpinBox()
+        self.spinbox_region1_end = QSpinBox()
+        self.spinbox_region2_start = QSpinBox()
+        self.spinbox_region2_end = QSpinBox()
+
+        # Layout the spinboxes somewhere in your UI
+        spinbox_layout = QVBoxLayout()
+        s1_layout = QHBoxLayout()
+        s2_layout = QHBoxLayout()
+        s1_layout.addWidget(QLabel("Range 1:"))
+        s1_layout.addWidget(self.spinbox_region1_start)
+        s1_layout.addWidget(self.spinbox_region1_end)
+        s2_layout.addWidget(QLabel("Range 2:"))
+        s2_layout.addWidget(self.spinbox_region2_start)
+        s2_layout.addWidget(self.spinbox_region2_end)
+        spinbox_layout.addLayout(s1_layout)
+        spinbox_layout.addLayout(s2_layout)
+
+        self.time_controls_group_box.setLayout(spinbox_layout)
+        # self.parent.layout().addWidget(self.time_controls_widget)  # Add to your UI layout
+
+        # Connect spinbox -> region
+        self.spinbox_region1_start.valueChanged.connect(
+            lambda: self.time_region1.setRegion(
+                (self.spinbox_region1_start.value(), self.spinbox_region1_end.value())
+            )
+        )
+        self.spinbox_region1_end.valueChanged.connect(
+            lambda: self.time_region1.setRegion(
+                (self.spinbox_region1_start.value(), self.spinbox_region1_end.value())
+            )
+        )
+        self.spinbox_region2_start.valueChanged.connect(
+            lambda: self.time_region2.setRegion(
+                (self.spinbox_region2_start.value(), self.spinbox_region2_end.value())
+            )
+        )
+        self.spinbox_region2_end.valueChanged.connect(
+            lambda: self.time_region2.setRegion(
+                (self.spinbox_region2_start.value(), self.spinbox_region2_end.value())
+            )
+        )
+
+        # Connect region -> spinbox
+
+        self.time_region1.sigRegionChanged.connect(self.update_spinboxes)
+        self.time_region2.sigRegionChanged.connect(self.update_spinboxes)
+
+    def update_spinboxes(self):
+        r1 = self.time_region1.getRegion()
+        r2 = self.time_region2.getRegion()
+        self.spinbox_region1_start.blockSignals(True)
+        self.spinbox_region1_end.blockSignals(True)
+        self.spinbox_region2_start.blockSignals(True)
+        self.spinbox_region2_end.blockSignals(True)
+        self.spinbox_region1_start.setValue(r1[0])
+        self.spinbox_region1_end.setValue(r1[1])
+        self.spinbox_region2_start.setValue(r2[0])
+        self.spinbox_region2_end.setValue(r2[1])
+        self.spinbox_region1_start.blockSignals(False)
+        self.spinbox_region1_end.blockSignals(False)
+        self.spinbox_region2_start.blockSignals(False)
+        self.spinbox_region2_end.blockSignals(False)
+
+        self.parent.extinction_ui.updateTimeRanges()
+        self.parent.extinction_ui.updateCurvesData()
+        self.parent.statistics_view.updateMeans()
+
     def cleanup(self):
         """
         Clean up the TimeSeries instance to prevent memory leaks.
@@ -98,40 +184,17 @@ class TimeSeries:
         self.addTimeRanges()
 
     def addTimeRanges(self):
-        # Add two time ranges for comparisons
-
-        color1 = QColor()
-        color1.setRgb(*time_color_palette[0])
-        color1.setAlpha(15)
-
-        color2 = QColor()
-        color2.setRgb(*time_color_palette[1])
-        color2.setAlpha(15)
-
-        self.time_region1 = pg.LinearRegionItem(
-            orientation="vertical", movable=True, brush=color1
-        )
-        self.time_region2 = pg.LinearRegionItem(
-            orientation="vertical", movable=True, brush=color2
-        )
-
         self.widget.addItem(self.time_region1)
         self.widget.addItem(self.time_region2)
-
         # Store initial values
         self.min_x = np.min(self.x_values)
         self.max_x = np.max(self.x_values)
         mid_x = (self.min_x + self.max_x) / 2
+        print(self.min_x, self.max_x, mid_x)
 
         # Set initial regions
         self.time_region1.setRegion((self.min_x, mid_x))
         self.time_region2.setRegion((mid_x, self.max_x))
-
-        # Create spinboxes
-        self.spinbox_region1_start = QSpinBox()
-        self.spinbox_region1_end = QSpinBox()
-        self.spinbox_region2_start = QSpinBox()
-        self.spinbox_region2_end = QSpinBox()
 
         for sb in [
             self.spinbox_region1_start,
@@ -148,67 +211,6 @@ class TimeSeries:
         self.spinbox_region2_start.setValue(mid_x)
         self.spinbox_region2_end.setValue(self.max_x)
 
-        # Layout the spinboxes somewhere in your UI
-        spinbox_layout = QVBoxLayout()
-        s1_layout = QHBoxLayout()
-        s2_layout = QHBoxLayout()
-        s1_layout.addWidget(QLabel("Range 1:"))
-        s1_layout.addWidget(self.spinbox_region1_start)
-        s1_layout.addWidget(self.spinbox_region1_end)
-        s2_layout.addWidget(QLabel("Range 2:"))
-        s2_layout.addWidget(self.spinbox_region2_start)
-        s2_layout.addWidget(self.spinbox_region2_end)
-        spinbox_layout.addLayout(s1_layout)
-        spinbox_layout.addLayout(s2_layout)
-
-        self.time_controls_group_box.setLayout(spinbox_layout)
-        # self.parent.layout().addWidget(self.time_controls_widget)  # Add to your UI layout
-
-        # Connect spinbox -> region
-        self.spinbox_region1_start.valueChanged.connect(
-            lambda: self.time_region1.setRegion(
-                (self.spinbox_region1_start.value(), self.spinbox_region1_end.value())
-            )
-        )
-        self.spinbox_region1_end.valueChanged.connect(
-            lambda: self.time_region1.setRegion(
-                (self.spinbox_region1_start.value(), self.spinbox_region1_end.value())
-            )
-        )
-        self.spinbox_region2_start.valueChanged.connect(
-            lambda: self.time_region2.setRegion(
-                (self.spinbox_region2_start.value(), self.spinbox_region2_end.value())
-            )
-        )
-        self.spinbox_region2_end.valueChanged.connect(
-            lambda: self.time_region2.setRegion(
-                (self.spinbox_region2_start.value(), self.spinbox_region2_end.value())
-            )
-        )
-
-        # Connect region -> spinbox
-        def update_spinboxes():
-            r1 = self.time_region1.getRegion()
-            r2 = self.time_region2.getRegion()
-            self.spinbox_region1_start.blockSignals(True)
-            self.spinbox_region1_end.blockSignals(True)
-            self.spinbox_region2_start.blockSignals(True)
-            self.spinbox_region2_end.blockSignals(True)
-            self.spinbox_region1_start.setValue(r1[0])
-            self.spinbox_region1_end.setValue(r1[1])
-            self.spinbox_region2_start.setValue(r2[0])
-            self.spinbox_region2_end.setValue(r2[1])
-            self.spinbox_region1_start.blockSignals(False)
-            self.spinbox_region1_end.blockSignals(False)
-            self.spinbox_region2_start.blockSignals(False)
-            self.spinbox_region2_end.blockSignals(False)
-
-            self.parent.extinction_ui.updateTimeRanges()
-            self.parent.extinction_ui.updateCurvesData()
-            self.parent.statistics_view.updateMeans()
-
-        self.time_region1.sigRegionChanged.connect(update_spinboxes)
-        self.time_region2.sigRegionChanged.connect(update_spinboxes)
         # self.time_region1.setRegion((min_x, np.floor(max_x / 2)))
         # self.widget.addItem(self.time_region1)
 
