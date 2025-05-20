@@ -2,21 +2,24 @@
 
 ## 1. Setting Up the Environment
 
-1. Install Miniconda or Anaconda if you don’t have it already.
-2. Clone or download this repository.
-3. Create the environment by running:
+1. Install Miniconda or Anaconda if you don’t have it already and activate it with
+   ```bash
+   conda activate
+   ```
+3. Clone or download this repository.
+4. Create the environment by running:
 
     ```bash
     conda env create -f environment.yml
     ```
 
-4. Activate the environment:
+5. Activate the environment:
 
     ```bash
     conda activate mika
     ```
 
-5. Then run the application:
+6. Then run the application:
 
     ```bash
     python app.py
