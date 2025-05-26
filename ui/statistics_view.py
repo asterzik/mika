@@ -74,12 +74,17 @@ class StatisticsView(QWidget):
         title_label = QLabel(f"<b>{group_name}</b>")
         title_label.setFixedWidth(80)  # Align group names
 
-        mean_label = QLabel(f"{mean[0]:.3f}±{std[0]:.3f}")
-        mean_range1_label = QLabel(f"{mean[1]:.3f}±{std[1]:.3f}")
-        mean_range2_label = QLabel(f"{mean[2]:.3f}±{std[2]:.3f}")
+        sig_digits = 3
+        mean_label = QLabel(f"{mean[0]:.{sig_digits}g}±{std[0]:.{sig_digits}g}")
+        mean_range1_label = QLabel(f"{mean[1]:.{sig_digits}g}±{std[1]:.{sig_digits}g}")
+        mean_range2_label = QLabel(f"{mean[2]:.{sig_digits}g}±{std[2]:.{sig_digits}g}")
+
         self.diff = mean[2] - mean[1]
-        self.diff_std = sqrt(std[1] * std[1] + std[2] * std[2])
-        diff_label = QLabel(f"<b>Diff R2 - R1:</b> {self.diff:.3f}±{self.diff_std:.3f}")
+        self.diff_std = sqrt(std[1] ** 2 + std[2] ** 2)
+
+        diff_label = QLabel(
+            f"<b>Diff R2 - R1:</b> {self.diff:.{sig_digits}g}±{self.diff_std:.{sig_digits}g}"
+        )
 
         # Check if the difference is larger than 3 times the standard deviation
         check_label = QLabel()
@@ -130,13 +135,19 @@ class StatisticsView(QWidget):
         for index, labels in self.label_references.items():
             mean = means[:, index]
             std = stds[:, index]
+
+            sig_digits = 3
             # labels["mean_label"].setText(f"{mean[0]:.3f}±{std[0]:.3f}")
-            labels["mean_range1_label"].setText(f"{mean[1]:.3f}±{std[1]:.3f}")
-            labels["mean_range2_label"].setText(f"{mean[2]:.3f}±{std[2]:.3f}")
+            labels["mean_range1_label"].setText(
+                f"{mean[1]:.{sig_digits}g}±{std[1]:.{sig_digits}g}"
+            )
+            labels["mean_range2_label"].setText(
+                f"{mean[2]:.{sig_digits}g}±{std[2]:.{sig_digits}g}"
+            )
             self.diff = mean[2] - mean[1]
             self.diff_std = sqrt(std[1] * std[1] + std[2] * std[2])
             labels["diff_label"].setText(
-                f"<b>Diff R2 - R1:</b> {self.diff:.3f}±{self.diff_std:.3f}"
+                f"<b>Diff R2 - R1:</b> {self.diff:.{sig_digits}g}±{self.diff_std:.{sig_digits}g}"
             )
             if abs(self.diff) > 3 * self.diff_std:
                 labels["check_label"].setVisible(True)
