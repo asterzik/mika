@@ -20,10 +20,14 @@ import math
 
 # TODO make that changeable in the GUI
 trim_percentage = 0.05
+# Threshold for excluding the darkest pixels from the calculations
+threshold = 33000
 
 
 def calculate_mean_intensity(image, mask, denoising_method):
     values = image[mask > 0]
+    print(max(values), min(values))
+    values = values[values > threshold]  # Exclude pixels below the threshold
     if len(values) == 0:
         return np.nan  # or 0, or handle as needed
 
@@ -103,6 +107,13 @@ def compute_fore_back_ground_pixels(
         mask_fg = np.zeros_like(image, dtype=np.uint8)
         cv2.circle(mask_fg, (a, b), int(f_radius), 255, -1)
         foreground_pixels.append(image[mask_fg == 255])
+
+    # Convert lists to numpy arrays
+    foreground_pixels = np.concatenate(foreground_pixels)
+    background_pixels = np.concatenate(background_pixels)
+    # Filter out pixels below the threshold
+    foreground_pixels = foreground_pixels[foreground_pixels > threshold]
+    background_pixels = background_pixels[background_pixels > threshold]
 
     return foreground_pixels, background_pixels
 
