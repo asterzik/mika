@@ -23,34 +23,26 @@ trim_percentage = 0.05
 
 
 def calculate_mean_intensity(image, mask, denoising_method):
+    values = image[mask > 0]
+    if len(values) == 0:
+        return np.nan  # or 0, or handle as needed
+
     if denoising_method == "Mean":
-        average = cv2.mean(image, mask)[0]
+        average = np.mean(values)
+    elif denoising_method == "Median":
+        average = np.median(values)
+    elif denoising_method == "Mode":
+        average = stats.mode(values)[0]
+    elif denoising_method == "Trimmed Mean":
+        n_trim = int(len(values) * trim_percentage)
+        sorted_vals = np.sort(values)
+        trimmed = sorted_vals[n_trim:-n_trim] if n_trim > 0 else sorted_vals
+        average = np.mean(trimmed)
+    elif denoising_method == "Huber Mean":
+        average = huber(values)[0]
     else:
-        # Create an array to hold the new values, initialized to -1
-        masked_image = np.full(image.shape, -1, dtype=np.int32)
+        average = np.mean(values)  # fallback
 
-        # Set the values of pixels inside the ROI to the corresponding values from masked_image
-        masked_image[mask > 0] = image[mask > 0]
-
-        # Get all pixel values from the modified image
-        all_values = masked_image.flatten()  # Flatten all pixel values
-
-        # Filter valid values to exclude -1 and calculate median
-        valid_values = all_values[all_values != -1]  # Exclude -1 values
-
-        # Compute the median of valid pixel values within the ROI
-        if denoising_method == "Median":
-            average = np.median(
-                valid_values
-            )  # Compute median only for valid pixel values
-        elif denoising_method == "Mode":
-            average = stats.mode(valid_values)[0]
-        elif denoising_method == "Trimmed Mean":
-            n_trim = int(len(valid_values) * trim_percentage)
-            trimmed_data = np.sort(valid_values)[n_trim:-n_trim]
-            average = np.mean(trimmed_data)
-        elif denoising_method == "Huber Mean":
-            average = huber(valid_values)[0]
     return average
 
 
@@ -72,18 +64,15 @@ def compute_fore_back_ground_per_image(
         b += int(round(shift[1]))
 
         # Calculate mean background intensity
-        grayscale_image = image[:, :, 0]
-        mask = np.zeros_like(grayscale_image, dtype=np.uint8)
+        mask = np.zeros_like(image, dtype=np.uint8)
         cv2.circle(mask, (a, b), int(b_radius_outer), 255, -1)
         cv2.circle(mask, (a, b), int(b_radius_inner), 0, -1)
-        background = calculate_mean_intensity(grayscale_image, mask, denoising_method)
+        background = calculate_mean_intensity(image, mask, denoising_method)
         average_background.append(background)
         # Calculate mean circle intensity
-        circle_mask = np.zeros_like(grayscale_image, dtype=np.uint8)
+        circle_mask = np.zeros_like(image, dtype=np.uint8)
         cv2.circle(circle_mask, (a, b), int(f_radius), 255, -1)
-        foreground = calculate_mean_intensity(
-            grayscale_image, circle_mask, denoising_method
-        )
+        foreground = calculate_mean_intensity(image, circle_mask, denoising_method)
         average_foreground.append(foreground)
     return np.array(average_foreground), np.array(average_background)
 
@@ -99,23 +88,21 @@ def compute_fore_back_ground_pixels(
     foreground_pixels = []
     background_pixels = []
 
-    grayscale_image = image[:, :, 0]
-
     for pt in selected_circles:
         a, b, r = int(pt[0]), int(pt[1]), int(pt[2])
         a += int(round(shift[0]))
         b += int(round(shift[1]))
 
         # Background mask (ring)
-        mask_bg = np.zeros_like(grayscale_image, dtype=np.uint8)
+        mask_bg = np.zeros_like(image, dtype=np.uint8)
         cv2.circle(mask_bg, (a, b), int(b_radius_outer), 255, -1)
         cv2.circle(mask_bg, (a, b), int(b_radius_inner), 0, -1)
-        background_pixels.append(grayscale_image[mask_bg == 255])
+        background_pixels.append(image[mask_bg == 255])
 
         # Foreground mask (inner circle)
-        mask_fg = np.zeros_like(grayscale_image, dtype=np.uint8)
+        mask_fg = np.zeros_like(image, dtype=np.uint8)
         cv2.circle(mask_fg, (a, b), int(f_radius), 255, -1)
-        foreground_pixels.append(grayscale_image[mask_fg == 255])
+        foreground_pixels.append(image[mask_fg == 255])
 
     return foreground_pixels, background_pixels
 
@@ -164,15 +151,23 @@ class Circles:
         Returns:
         - None
         """
-        # Convert to grayscale
-        gray = cv2.cvtColor(self.input_img, cv2.COLOR_BGR2GRAY)
+        # gray = cv2.cvtColor(self.input_img, cv2.COLOR_BGR2GRAY)
+        image = self.input_img.copy()
+        if image.ndim == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Convert to 8-bit (normalize if needed)
+        if image.dtype != np.uint8:
+            # Normalize to 0–255 and convert to uint8
+            image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX)
+            image = image.astype(np.uint8)
 
         # # Blur the image
         # gray_blurred = cv2.blur(gray, (3, 3))
 
         # Apply Hough transform to detect circles
         detected_circles = cv2.HoughCircles(
-            gray,
+            image,
             cv2.HOUGH_GRADIENT,
             dp=self.dp,
             minDist=self.min_dist,
@@ -302,9 +297,42 @@ class Circles:
                 grouped_images[frame] = []
 
             # Load the grayscale image
-            image = cv2.imread(
-                os.path.join(image_path, image_name), cv2.IMREAD_GRAYSCALE
+            # image = cv2.imread(
+            #     os.path.join(image_path, image_name), cv2.IMREAD_GRAYSCALE
+            # )
+            # image = cv2.imread(
+            #     os.path.join(image_path, image_name), cv2.IMREAD_UNCHANGED
+            # )
+            # if image is None:
+            #     raise ValueError(f"Failed to load image: {image_name}")
+            # if image.ndim == 3:
+            #     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+            image_raw = cv2.imread(
+                os.path.join(image_path, image_name), cv2.IMREAD_UNCHANGED
             )
+
+            if image_raw is None:
+                raise ValueError(
+                    f"Failed to load image: {image_name}. Check file path and integrity."
+                )
+
+            # Convert the image to float32 immediately to preserve precision.
+            # This handles both 8-bit and higher bit-depth images (e.g., 16-bit TIFFs)
+            # and ensures subsequent operations are done with higher precision.
+            image_float = image_raw.astype(np.float32)
+
+            # If the image was loaded as a color image (e.g., BGR, BGRA), convert it to grayscale.
+            # This conversion will now operate on float32 data, resulting in a float32 grayscale image.
+            if image_float.ndim == 3:
+                # Check for alpha channel (4 channels)
+                if image_float.shape[2] == 4:
+                    image = cv2.cvtColor(image_float, cv2.COLOR_BGRA2GRAY)
+                else:  # Assume BGR (3 channels)
+                    image = cv2.cvtColor(image_float, cv2.COLOR_BGR2GRAY)
+            else:
+                # Image was already grayscale (2D array)
+                image = image_float
 
             # Append the (wavelength, image, image_name) tuple to the list for the frame
             grouped_images[frame].append((wavelength, image, image_name))
@@ -333,21 +361,12 @@ class Circles:
             # Extract the sorted grayscale images and their names
             sorted_images = [img for _, img, _ in images_with_wavelengths]
 
-            # # Denoise the sorted images
-            # if denoising_method == "None":
             smoothed_images = sorted_images
-            # else:
-            #   smoothed_images = denoise_hsi_images(sorted_images, denoising_method)
 
-            # Convert each denoised grayscale image to RGB and append it to self.images
             for i, (wavelength, image, image_name) in enumerate(
                 images_with_wavelengths
             ):
-                grayscale_image = smoothed_images[i]
-                rgb_image = cv2.merge(
-                    [grayscale_image, grayscale_image, grayscale_image]
-                )
-                self.images[i, frame - 1] = rgb_image
+                self.images[i, frame - 1] = smoothed_images[i]
                 self.image_names[i, frame - 1] = image_name
 
         # Update self.image_names to reflect the new order
@@ -384,13 +403,7 @@ class Circles:
             index_wavelength = unique_wl.tolist().index(wl)
             image = self.images[index_wavelength * len(unique_frames) + index_frame]
 
-            # Transform to grayscale float for phase correlate
-            ref_float = np.float32(
-                cv2.cvtColor(highest_contrast_image, cv2.COLOR_BGR2GRAY)
-            )
-            cur_float = np.float32(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY))
-
-            shift, _ = cv2.phaseCorrelate(ref_float, cur_float)
+            shift, _ = cv2.phaseCorrelate(highest_contrast_image, image)
             self.shifts[index_wavelength] = shift
 
         num_repeats = int(len(self.frames) / len(unique_frames))
@@ -414,16 +427,19 @@ class Circles:
         index_frame = unique_frames.index(frame)
         image = self.images[index_wavelength * len(unique_frames) + index_frame]
 
-        image_uint8 = image.astype(np.uint8)
+        image_uint8 = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
 
         # Convert the image to QImage
-        height, width, channels = image_uint8.shape
-        bytes_per_line = channels * width
+        height, width = image_uint8.shape
+        bytes_per_line = width
         q_image = QImage(
-            image_uint8.data, width, height, bytes_per_line, QImage.Format_RGB888
+            image_uint8.copy().data,
+            width,
+            height,
+            bytes_per_line,
+            QImage.Format_Grayscale8,
         ).rgbSwapped()
 
-        # Create QPixmap from QImage
         pixmap = QPixmap.fromImage(q_image)
         return pixmap
 
@@ -434,11 +450,23 @@ class Circles:
         Returns:
         - QPixmap: QPixmap object containing the input image.
         """
-        height, width, channels = self.input_img.shape
-        bytes_per_line = channels * width
+        display_image_uint8 = cv2.normalize(
+            self.input_img, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U
+        )
+
+        height, width = display_image_uint8.shape
+        bytes_per_line = width
+
+        # Use .copy().data to ensure QImage takes ownership of the data buffer,
+        # preventing potential issues if the original numpy array's memory is released.
         qimg = QImage(
-            self.input_img.data, width, height, bytes_per_line, QImage.Format_RGB888
-        ).rgbSwapped()
+            display_image_uint8.copy().data,
+            width,
+            height,
+            bytes_per_line,
+            QImage.Format_Grayscale8,
+        )
+
         qpixmap = QPixmap.fromImage(qimg)
         return qpixmap
 
