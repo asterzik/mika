@@ -69,7 +69,7 @@ def compute_fore_back_ground_per_image(
     for pt in selected_circles:
         a, b, r = int(pt[0]), int(pt[1]), int(pt[2])
         a += int(round(shift[0]))
-        b += int(round(shift[0]))
+        b += int(round(shift[1]))
 
         # Calculate mean background intensity
         grayscale_image = image[:, :, 0]
@@ -86,6 +86,38 @@ def compute_fore_back_ground_per_image(
         )
         average_foreground.append(foreground)
     return np.array(average_foreground), np.array(average_background)
+
+
+def compute_fore_back_ground_pixels(
+    image,
+    selected_circles,
+    b_radius_inner,
+    b_radius_outer,
+    f_radius,
+    shift,
+):
+    foreground_pixels = []
+    background_pixels = []
+
+    grayscale_image = image[:, :, 0]
+
+    for pt in selected_circles:
+        a, b, r = int(pt[0]), int(pt[1]), int(pt[2])
+        a += int(round(shift[0]))
+        b += int(round(shift[1]))
+
+        # Background mask (ring)
+        mask_bg = np.zeros_like(grayscale_image, dtype=np.uint8)
+        cv2.circle(mask_bg, (a, b), int(b_radius_outer), 255, -1)
+        cv2.circle(mask_bg, (a, b), int(b_radius_inner), 0, -1)
+        background_pixels.append(grayscale_image[mask_bg == 255])
+
+        # Foreground mask (inner circle)
+        mask_fg = np.zeros_like(grayscale_image, dtype=np.uint8)
+        cv2.circle(mask_fg, (a, b), int(f_radius), 255, -1)
+        foreground_pixels.append(grayscale_image[mask_fg == 255])
+
+    return foreground_pixels, background_pixels
 
 
 class Circles:
@@ -409,6 +441,16 @@ class Circles:
         ).rgbSwapped()
         qpixmap = QPixmap.fromImage(qimg)
         return qpixmap
+
+    def fore_background_input_image(self, b_radius_inner, b_radius_outer, f_radius):
+        return compute_fore_back_ground_pixels(
+            self.input_img,
+            self.detected_circles[0, self.selected_spots],
+            b_radius_inner,
+            b_radius_outer,
+            f_radius,
+            np.zeros_like(self.shifts[0]),
+        )
 
     def detected_circles(self):
         """

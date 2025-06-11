@@ -476,30 +476,33 @@ class SpotDetectionUi:
         # self.background_outer_radius_param.setRange(1.5, 2)
 
         self.update_button = QPushButton("Update")
-        self.update_button.clicked.connect(self.circles.compute_extinction)
+        self.update_button.clicked.connect(self.draw_histogram)
 
     def draw_histogram(self):
+        # Extract foreground and background data from the representative image
+        foreground_data, background_data = self.circles.fore_background_input_image(
+            self.background_inner_radius_param.value(),
+            self.background_outer_radius_param.value(),
+            self.inner_radius_param.value(),
+        )
+        foreground_data = np.concatenate(foreground_data)
+        background_data = np.concatenate(background_data)
         self.hist_widget.clear()
-        # Ensure foreground and background data exist
-        if self.circles.foreground is not None and self.circles.background is not None:
-            # Flatten the arrays and concatenate them
-            foreground_data = self.circles.foreground.flatten()
-            background_data = self.circles.background.flatten()
 
-            # Calculate histogram
-            y, x = np.histogram(foreground_data, bins=50)
+        # Calculate histogram
+        y, x = np.histogram(foreground_data, bins=50)
 
-            brush = pg.mkBrush((*time_color_palette[0], 200))
+        brush = pg.mkBrush((*time_color_palette[0], 200))
 
-            # Plot the histogram
-            self.hist_widget.plot(x, y, stepMode=True, fillLevel=0, brush=brush)
+        # Plot the histogram
+        self.hist_widget.plot(x, y, stepMode=True, fillLevel=0, brush=brush)
 
-            y, x = np.histogram(background_data, bins=50)
+        y, x = np.histogram(background_data, bins=50)
 
-            brush = pg.mkBrush((*time_color_palette[1], 200))
+        brush = pg.mkBrush((*time_color_palette[1], 200))
 
-            # Plot the histogram
-            self.hist_widget.plot(x, y, stepMode=True, fillLevel=0, brush=brush)
+        # Plot the histogram
+        self.hist_widget.plot(x, y, stepMode=True, fillLevel=0, brush=brush)
 
     def extinction_values_changed(self):
         self.circles.extinction_bool = False
