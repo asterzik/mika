@@ -483,8 +483,9 @@ class SpotDetectionUi:
         )
 
         self.lower_threshold_param = QSpinBox()
-        self.lower_threshold_param.setValue(0)
+        self.lower_threshold_param.setMinimum(-1)
         self.lower_threshold_param.setMaximum(2_000_000_000)
+        self.lower_threshold_param.setValue(-1)
         self.lower_threshold_param.setSingleStep(1)
         self.lower_threshold_param.valueChanged.connect(self.extinction_values_changed)
         self.lower_threshold_label = QLabel("Lower Threshold")
@@ -496,8 +497,9 @@ class SpotDetectionUi:
         )
 
         self.upper_threshold_param = QSpinBox()
-        self.upper_threshold_param.setValue(255)
+        self.upper_threshold_param.setMinimum(-1)
         self.upper_threshold_param.setMaximum(2_000_000_000)
+        self.upper_threshold_param.setValue(-1)
         self.upper_threshold_param.setSingleStep(1)
         self.upper_threshold_param.valueChanged.connect(self.extinction_values_changed)
         self.upper_threshold_label = QLabel("Upper Threshold")
@@ -526,6 +528,46 @@ class SpotDetectionUi:
 
         self.hist_widget.setLabel("left", "Pixel Count")
         self.hist_widget.setLabel("bottom", "Pixel Intensity")
+
+        # Remove the previous threshold region if it exists
+        if hasattr(self, "threshold_region"):
+            self.hist_widget.removeItem(self.threshold_region)
+
+        # Add a shaded region between lower and upper thresholds
+        if self.lower_threshold_param.value() == -1:
+            min_val = min(np.min(foreground_data), np.min(background_data))
+            self.lower_threshold_param.setValue(int(min_val))
+        if self.upper_threshold_param.value() == -1:
+            max_val = max(np.max(foreground_data), np.max(background_data))
+            self.upper_threshold_param.setValue(int(max_val))
+        self.threshold_region = pg.LinearRegionItem(
+            values=(
+                self.lower_threshold_param.value(),
+                self.upper_threshold_param.value(),
+            ),
+            orientation="vertical",
+        )
+        self.threshold_region.setBrush(pg.mkBrush(50, 50, 50, 50))
+        self.threshold_region.setZValue(-10)  # Make sure it sits behind plot lines
+
+        self.hist_widget.addItem(self.threshold_region)
+        self.threshold_region.sigRegionChanged.connect(
+            self.update_spinboxes_from_region
+        )
+
+    def update_spinboxes_from_region(self):
+        lower, upper = self.threshold_region.getRegion()
+        self.lower_threshold_param.blockSignals(True)
+        self.upper_threshold_param.blockSignals(True)
+
+        self.lower_threshold_param.setValue(int(lower))
+        self.upper_threshold_param.setValue(int(upper))
+
+        self.lower_threshold_param.blockSignals(False)
+        self.upper_threshold_param.blockSignals(False)
+
+        # Optionally call your shared update method manually
+        self.extinction_values_changed()
 
     def extinction_values_changed(self):
         self.circles.extinction_bool = False
