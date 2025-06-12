@@ -515,16 +515,14 @@ class SpotDetectionUi:
         self.hist_widget.clear()
 
         # Plot foreground histogram
-        y_fg, bin_edges_fg = np.histogram(foreground_data, bins=50)
-        x_fg = 0.5 * (bin_edges_fg[1:] + bin_edges_fg[:-1])
+        y_fg, x_fg = np.histogram(foreground_data, bins=50)
         brush_fg = pg.mkBrush((*time_color_palette[0], 200))
-        self.hist_widget.plot(x_fg, y_fg, stepMode=False, fillLevel=0, brush=brush_fg)
+        self.hist_widget.plot(x_fg, y_fg, stepMode=True, fillLevel=0, brush=brush_fg)
 
         # Plot background histogram
-        y_bg, bin_edges_bg = np.histogram(background_data, bins=50)
-        x_bg = 0.5 * (bin_edges_bg[1:] + bin_edges_bg[:-1])
+        y_bg, x_bg = np.histogram(background_data, bins=50)
         brush_bg = pg.mkBrush((*time_color_palette[1], 200))
-        self.hist_widget.plot(x_bg, y_bg, stepMode=False, fillLevel=0, brush=brush_bg)
+        self.hist_widget.plot(x_bg, y_bg, stepMode=True, fillLevel=0, brush=brush_bg)
 
         self.hist_widget.setLabel("left", "Pixel Count")
         self.hist_widget.setLabel("bottom", "Pixel Intensity")

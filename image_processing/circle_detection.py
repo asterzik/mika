@@ -26,7 +26,6 @@ def calculate_mean_intensity(
     image, mask, denoising_method, lower_threshold, upper_threshold
 ):
     values = image[mask > 0]
-    print(max(values), min(values))
     if lower_threshold is not None and upper_threshold is not None:
         values = values[(values > lower_threshold) & (values < upper_threshold)]
     elif lower_threshold is not None:
