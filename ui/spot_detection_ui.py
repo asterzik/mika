@@ -475,6 +475,18 @@ class SpotDetectionUi:
         self.background_outer_radius_param.setSingleStep(1)
         # self.background_outer_radius_param.setRange(1.5, 2)
 
+        self.lower_threshold_param = QSpinBox()
+        self.lower_threshold_param.setValue(0)
+        self.lower_threshold_param.setMaximum(2_000_000_000)
+        self.lower_threshold_param.setSingleStep(1)
+        self.lower_threshold_label = QLabel("Lower Threshold")
+
+        self.upper_threshold_param = QSpinBox()
+        self.upper_threshold_param.setValue(255)
+        self.upper_threshold_param.setMaximum(2_000_000_000)
+        self.upper_threshold_param.setSingleStep(1)
+        self.upper_threshold_label = QLabel("Upper Threshold")
+
         self.update_button = QPushButton("Update")
         self.update_button.clicked.connect(self.draw_histogram)
 
@@ -566,6 +578,8 @@ class SpotDetectionUi:
         extinction_layout.addRow(
             self.background_outer_radius_label, self.background_outer_radius_param
         )
+        extinction_layout.addRow(self.lower_threshold_label, self.lower_threshold_param)
+        extinction_layout.addRow(self.upper_threshold_label, self.upper_threshold_param)
         extinction_layout.addWidget(self.update_button)
 
         extinction_boundaries_box.setLayout(extinction_layout)
