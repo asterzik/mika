@@ -20,14 +20,20 @@ import math
 
 # TODO make that changeable in the GUI
 trim_percentage = 0.05
-# Threshold for excluding the darkest pixels from the calculations
-threshold = 33000
 
 
-def calculate_mean_intensity(image, mask, denoising_method):
+def calculate_mean_intensity(
+    image, mask, denoising_method, lower_threshold, upper_threshold
+):
     values = image[mask > 0]
     print(max(values), min(values))
-    values = values[values > threshold]  # Exclude pixels below the threshold
+    if lower_threshold is not None and upper_threshold is not None:
+        values = values[(values > lower_threshold) & (values < upper_threshold)]
+    elif lower_threshold is not None:
+        values = values[values > lower_threshold]
+    elif upper_threshold is not None:
+        values = values[values < upper_threshold]
+    # If both are None, do not filter
     if len(values) == 0:
         return np.nan  # or 0, or handle as needed
 
@@ -58,6 +64,8 @@ def compute_fore_back_ground_per_image(
     b_radius_outer,
     f_radius,
     shift,
+    lower_threshold,
+    upper_threshold,
 ):
     average_foreground = []
     average_background = []
@@ -71,12 +79,16 @@ def compute_fore_back_ground_per_image(
         mask = np.zeros_like(image, dtype=np.uint8)
         cv2.circle(mask, (a, b), int(b_radius_outer), 255, -1)
         cv2.circle(mask, (a, b), int(b_radius_inner), 0, -1)
-        background = calculate_mean_intensity(image, mask, denoising_method)
+        background = calculate_mean_intensity(
+            image, mask, denoising_method, lower_threshold, upper_threshold
+        )
         average_background.append(background)
         # Calculate mean circle intensity
         circle_mask = np.zeros_like(image, dtype=np.uint8)
         cv2.circle(circle_mask, (a, b), int(f_radius), 255, -1)
-        foreground = calculate_mean_intensity(image, circle_mask, denoising_method)
+        foreground = calculate_mean_intensity(
+            image, circle_mask, denoising_method, lower_threshold, upper_threshold
+        )
         average_foreground.append(foreground)
     return np.array(average_foreground), np.array(average_background)
 
@@ -88,6 +100,8 @@ def compute_fore_back_ground_pixels(
     b_radius_outer,
     f_radius,
     shift,
+    lower_threshold,
+    upper_threshold,
 ):
     foreground_pixels = []
     background_pixels = []
@@ -111,9 +125,22 @@ def compute_fore_back_ground_pixels(
     # Convert lists to numpy arrays
     foreground_pixels = np.concatenate(foreground_pixels)
     background_pixels = np.concatenate(background_pixels)
-    # Filter out pixels below the threshold
-    foreground_pixels = foreground_pixels[foreground_pixels > threshold]
-    background_pixels = background_pixels[background_pixels > threshold]
+    if lower_threshold is not None and upper_threshold is not None:
+        foreground_pixels = foreground_pixels[
+            (foreground_pixels > lower_threshold)
+            & (foreground_pixels < upper_threshold)
+        ]
+        background_pixels = background_pixels[
+            (background_pixels > lower_threshold)
+            & (background_pixels < upper_threshold)
+        ]
+    elif lower_threshold is not None:
+        foreground_pixels = foreground_pixels[foreground_pixels > lower_threshold]
+        background_pixels = background_pixels[background_pixels > lower_threshold]
+    elif upper_threshold is not None:
+        foreground_pixels = foreground_pixels[foreground_pixels < upper_threshold]
+        background_pixels = background_pixels[background_pixels < upper_threshold]
+    # If both are None, do not filter
 
     return foreground_pixels, background_pixels
 
@@ -482,6 +509,13 @@ class Circles:
         return qpixmap
 
     def fore_background_input_image(self, b_radius_inner, b_radius_outer, f_radius):
+        lower_threshold = None
+        if self.parent.lower_threshold_enabled.isChecked():
+            lower_threshold = self.parent.lower_threshold_param.value()
+        upper_threshold = None
+        if self.parent.upper_threshold_enabled.isChecked():
+            upper_threshold = self.parent.upper_threshold_param.value()
+
         return compute_fore_back_ground_pixels(
             self.input_img,
             self.detected_circles[0, self.selected_spots],
@@ -489,6 +523,8 @@ class Circles:
             b_radius_outer,
             f_radius,
             np.zeros_like(self.shifts[0]),
+            lower_threshold,
+            upper_threshold,
         )
 
     def detected_circles(self):
@@ -685,6 +721,13 @@ class Circles:
 
         pool = mp.Pool(mp.cpu_count())
 
+        lower_threshold = None
+        if self.parent.lower_threshold_enabled.isChecked():
+            lower_threshold = self.parent.lower_threshold_param.value()
+        upper_threshold = None
+        if self.parent.upper_threshold_enabled.isChecked():
+            upper_threshold = self.parent.upper_threshold_param.value()
+
         mp_inputs = [
             (
                 image,
@@ -694,6 +737,8 @@ class Circles:
                 self.parent.background_outer_radius_param.value(),
                 self.parent.inner_radius_param.value(),
                 self.shifts[np.unique(self.wavelengths).tolist().index(wl)],
+                lower_threshold,
+                upper_threshold,
             )
             for image, wl in zip(self.images, self.wavelengths, strict=True)
         ]
