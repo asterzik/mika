@@ -507,7 +507,7 @@ class SpotDetectionUi:
 
     def draw_histogram(self):
         # Extract foreground and background data from the representative image
-        foreground_data, background_data = self.circles.fore_background_input_image(
+        foreground_data, background_data = self.circles.fore_background_first_time_step(
             self.background_inner_radius_param.value(),
             self.background_outer_radius_param.value(),
             self.inner_radius_param.value(),

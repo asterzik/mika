@@ -420,9 +420,11 @@ class Circles:
         highest_contrast = 0
         # Only check for the first frame, the other frames are similar
         index_frame = unique_frames.tolist().index(0)
+        self.first_frame_images = []
         for wl in unique_wl:
             index_wavelength = unique_wl.tolist().index(wl)
             image = self.images[index_wavelength * len(unique_frames) + index_frame]
+            self.first_frame_images.append(image)
 
             std = np.std(image)
             if std > highest_contrast:
@@ -508,7 +510,7 @@ class Circles:
         qpixmap = QPixmap.fromImage(qimg)
         return qpixmap
 
-    def fore_background_input_image(self, b_radius_inner, b_radius_outer, f_radius):
+    def fore_background_first_time_step(self, b_radius_inner, b_radius_outer, f_radius):
         lower_threshold = None
         if self.parent.lower_threshold_enabled.isChecked():
             lower_threshold = self.parent.lower_threshold_param.value()
@@ -516,16 +518,34 @@ class Circles:
         if self.parent.upper_threshold_enabled.isChecked():
             upper_threshold = self.parent.upper_threshold_param.value()
 
-        return compute_fore_back_ground_pixels(
-            self.input_img,
-            self.detected_circles[0, self.selected_spots],
-            b_radius_inner,
-            b_radius_outer,
-            f_radius,
-            np.zeros_like(self.shifts[0]),
-            lower_threshold,
-            upper_threshold,
-        )
+        foreground_list = []
+        backkground_list = []
+
+        pool = mp.Pool(mp.cpu_count())
+
+        mp_inputs = [
+            (
+                image,
+                self.detected_circles[0, self.selected_spots],
+                b_radius_inner,
+                b_radius_outer,
+                f_radius,
+                self.shifts[np.unique(self.wavelengths).tolist().index(wl)],
+                lower_threshold,
+                upper_threshold,
+            )
+            for image, wl in zip(
+                self.first_frame_images, np.unique(self.wavelengths), strict=True
+            )
+        ]
+        with ThreadPool(processes=4) as pool:
+            results = pool.starmap(compute_fore_back_ground_pixels, mp_inputs)
+        pool.close()
+        pool.join()
+        foreground, background = zip(*results)
+        foreground = np.concatenate(foreground)
+        background = np.concatenate(background)
+        return foreground, background
 
     def detected_circles(self):
         """
