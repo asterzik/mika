@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QFrame, QHBoxLayout
 from misc.colors import color_palette, time_color_palette
 from PySide6.QtGui import QColor
 from math import sqrt
+import numpy as np
 
 
 class StatisticsFrame(QFrame):
@@ -14,8 +15,16 @@ class StatisticsFrame(QFrame):
         self.stds = stds
         self.sig_digits = 3
         self.diff_labels = []
-        self.diff = self.means[2] - self.means[1]
-        self.diff_std = sqrt(self.stds[1] ** 2 + self.stds[2] ** 2)
+        self.diff = np.zeros(len(self.means) - 1)
+        self.diff_std = np.zeros(len(self.stds) - 1)
+        for i, mean in enumerate(self.means):
+            if i == 0:
+                continue
+            self.diff[i - 1] = mean - self.means[0]
+        for i, std in enumerate(self.stds):
+            if i == 0:
+                continue
+            self.diff_std[i - 1] = sqrt(std**2 + self.stds[0] ** 2)
 
         rgb_color = color_palette[self.group_label]
         self.color_str = f"rgb({rgb_color[0]}, {rgb_color[1]}, {rgb_color[2]})"
@@ -56,8 +65,9 @@ class StatisticsFrame(QFrame):
         # Store references to the QLabel widgets
 
     def addDiffLabel(self):
+        index = len(self.diff_labels)
         diff_label = QLabel(
-            f"<b>Diff 1:</b> {self.diff:.{self.sig_digits}g}±{self.diff_std:.{self.sig_digits}g}"
+            f"<b>Diff {index + 1}:</b> {self.diff[index]:.{self.sig_digits}g}±{self.diff_std[index]:.{self.sig_digits}g}"
         )
         self.layout.addWidget(diff_label)
         self.diff_labels.append(diff_label)
@@ -65,11 +75,19 @@ class StatisticsFrame(QFrame):
     def updateDiffs(self, means, stds):
         self.means = means
         self.stds = stds
-        self.diff = self.means[2] - self.means[1]
-        self.diff_std = sqrt(self.stds[1] ** 2 + self.stds[2] ** 2)
-        for diff_label in self.diff_labels:
+        self.diff = np.zeros(len(self.means) - 1)
+        self.diff_std = np.zeros(len(self.stds) - 1)
+        for i, mean in enumerate(self.means):
+            if i == 0:
+                continue
+            self.diff[i - 1] = mean - self.means[0]
+        for i, std in enumerate(self.stds):
+            if i == 0:
+                continue
+            self.diff_std[i - 1] = sqrt(std**2 + self.stds[0] ** 2)
+        for i, diff_label in enumerate(self.diff_labels):
             diff_label.setText(
-                f"<b>Diff 1:</b> {self.diff:.{self.sig_digits}g}±{self.diff_std:.{self.sig_digits}g}"
+                f"<b>Diff {i + 1}:</b> {self.diff[i]:.{self.sig_digits}g}±{self.diff_std[i]:.{self.sig_digits}g}"
             )
 
     def clear(self):

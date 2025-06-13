@@ -82,8 +82,7 @@ class ExtinctionUi:
         self.num_spots = None
         self.curves = None
         self.num_regression_points = 40
-        self.time_range1_indices = None
-        self.time_range2_indices = None
+        self.time_range_indices = []
         self.metric = None
         self.averaged_metric = None
         self.time_average_curves = None
@@ -377,24 +376,24 @@ class ExtinctionUi:
         # Fit and plot for both time ranges
 
         x_plot, y_plot = self.compute_average_over_time(
-            self.time_range1_indices, spot_index
+            self.time_range_indices[0], spot_index
         )
         line = pg.PlotDataItem(x_plot, y_plot, pen=pen1, symbol=None)
         self.plot_widget.addItem(line)
         self.time_average_curves[0, spot_index] = line
 
         x_plot, y_plot = self.compute_average_over_time(
-            self.time_range2_indices, spot_index
+            self.time_range_indices[1], spot_index
         )
         line = pg.PlotDataItem(x_plot, y_plot, pen=pen2, symbol=None)
         self.plot_widget.addItem(line)
         self.time_average_curves[1, spot_index] = line
 
     def updateAverageOverTime(self, group_index):
-        x, y = self.compute_average_over_time(self.time_range1_indices, group_index)
+        x, y = self.compute_average_over_time(self.time_range_indices[0], group_index)
         self.time_average_curves[0, group_index].setData(x, y)
 
-        x, y = self.compute_average_over_time(self.time_range2_indices, group_index)
+        x, y = self.compute_average_over_time(self.time_range_indices[1], group_index)
         self.time_average_curves[1, group_index].setData(x, y)
 
     def toggle_time_average(self):
@@ -740,29 +739,23 @@ class ExtinctionUi:
         return self.time_series_x, self.time_series_y
 
     def updateTimeRanges(self):
+        self.time_range_indices = [None] * len(self.parent.time_series.time_ranges)
         for i, range in enumerate(self.parent.time_series.time_ranges):
             region = range.getRegion()
-            if i == 0:
-                self.time_range1_indices = np.where(
-                    (self.time_series_x >= region[0])
-                    & (self.time_series_x <= region[1])
-                )[0]
-            elif i == 1:
-                self.time_range2_indices = np.where(
-                    (self.time_series_x >= region[0])
-                    & (self.time_series_x <= region[1])
-                )[0]
+            self.time_range_indices[i] = np.where(
+                (self.time_series_x >= region[0]) & (self.time_series_x <= region[1])
+            )[0]
 
     def get_diff_and_std(self):
         if self.individual_metric is None:
             self.regression(average_first=False)
 
-        range1 = self.individual_metric[self.time_range1_indices, :, 0]
+        range1 = self.individual_metric[self.time_range_indices[0], :, 0]
         range1_means = np.mean(range1, axis=0)
         # Divide std by sample size to compute standard error of the mean
         range1_std = np.std(range1, axis=0) / np.sqrt(len(range1))
 
-        range2 = self.individual_metric[self.time_range2_indices, :, 0]
+        range2 = self.individual_metric[self.time_range_indices[1], :, 0]
         range2_means = np.mean(range2, axis=0)
         range2_std = np.std(range2, axis=0) / np.sqrt(len(range2))
 
@@ -773,17 +766,17 @@ class ExtinctionUi:
 
     def get_statistics(self):
         # Calculate mean and std for range1
-        range1_means = np.mean(self.time_series_y[self.time_range1_indices], axis=0)
+        range1_means = np.mean(self.time_series_y[self.time_range_indices[0]], axis=0)
         # Divide std by sample size to compute standard error of the mean
         range1_std = np.std(
-            self.time_series_y[self.time_range1_indices], axis=0
-        ) / np.sqrt(len(self.time_range1_indices))
+            self.time_series_y[self.time_range_indices[0]], axis=0
+        ) / np.sqrt(len(self.time_range_indices[0]))
 
         # Calculate mean and std for range2
-        range2_means = np.mean(self.time_series_y[self.time_range2_indices], axis=0)
+        range2_means = np.mean(self.time_series_y[self.time_range_indices[1]], axis=0)
         range2_std = np.std(
-            self.time_series_y[self.time_range2_indices], axis=0
-        ) / np.sqrt(len(self.time_range2_indices))
+            self.time_series_y[self.time_range_indices[1]], axis=0
+        ) / np.sqrt(len(self.time_range_indices[1]))
 
         # Calculate overall mean and std
         mean = np.mean(self.time_series_y, axis=0)
