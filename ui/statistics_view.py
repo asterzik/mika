@@ -4,6 +4,83 @@ from PySide6.QtGui import QColor
 from math import sqrt
 
 
+class StatisticsFrame(QFrame):
+    def __init__(self, parent, group_label, group_name, means, stds):
+        super().__init__()
+        self.parent = parent
+        self.group_label = group_label
+        self.group_name = group_name
+        self.means = means
+        self.stds = stds
+        self.sig_digits = 3
+        self.diff_labels = []
+        self.diff = self.means[2] - self.means[1]
+        self.diff_std = sqrt(self.stds[1] ** 2 + self.stds[2] ** 2)
+
+        rgb_color = color_palette[self.group_label]
+        self.color_str = f"rgb({rgb_color[0]}, {rgb_color[1]}, {rgb_color[2]})"
+
+        self.setFrameShape(QFrame.Box)
+        self.setStyleSheet(
+            f"""
+            QFrame {{
+                background-color: #f4f4f4;
+                border: 2px solid {self.color_str}; 
+                border-radius: 4px;
+                padding: 5px;
+            }}
+            QLabel {{
+                font-size: 12px;
+                border: 1px solid gray;
+            }}
+        """
+        )
+        self.layout = QHBoxLayout()
+        self.layout.setContentsMargins(8, 2, 8, 2)  # Minimize inner padding
+        self.layout.setSpacing(15)  # Space between labels
+
+        title_label = QLabel(f"<b>{self.group_name}</b>")
+        title_label.setFixedWidth(80)  # Align group names
+
+        self.layout.addWidget(title_label)
+        self.setLayout(self.layout)
+        self.addDiffLabel()
+        # self.layout.addStretch()  # Push everything neatly to the left
+
+        # Check if the difference is larger than 3 times the standard deviation
+        # check_label = QLabel()
+        # check_label.setText("✔️")  # Unicode checkmark
+        # if abs(self.diff) < 3 * self.diff_std:
+        #     check_label.setVisible(False)
+
+        # Store references to the QLabel widgets
+
+    def addDiffLabel(self):
+        diff_label = QLabel(
+            f"<b>Diff 1:</b> {self.diff:.{self.sig_digits}g}±{self.diff_std:.{self.sig_digits}g}"
+        )
+        self.layout.addWidget(diff_label)
+        self.diff_labels.append(diff_label)
+
+    def updateDiffs(self, means, stds):
+        self.means = means
+        self.stds = stds
+        self.diff = self.means[2] - self.means[1]
+        self.diff_std = sqrt(self.stds[1] ** 2 + self.stds[2] ** 2)
+        for diff_label in self.diff_labels:
+            diff_label.setText(
+                f"<b>Diff 1:</b> {self.diff:.{self.sig_digits}g}±{self.diff_std:.{self.sig_digits}g}"
+            )
+
+    def clear(self):
+        while self.layout.count():
+            item = self.layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+
+
 class StatisticsView(QWidget):
     def __init__(self, parent, title="Means and Standard Errors"):
         super().__init__()
@@ -15,7 +92,7 @@ class StatisticsView(QWidget):
         # Section Title Label (inside the widget)
 
         self.setLayout(self.layout)
-        self.label_references = {}  # Dictionary to store references to QLabel widgets
+        self.frames = []
 
     def clear(self):
         while self.layout.count():
@@ -24,7 +101,9 @@ class StatisticsView(QWidget):
             if widget is not None:
                 widget.setParent(None)  # Remove from layout
                 widget.deleteLater()  # Schedule deletion
-        self.label_references.clear()
+        for frame in self.frames:
+            frame.clear()
+        self.frames = []
 
     def init_groups(self, means, stds, group_labels):
         self.setUpdatesEnabled(False)
@@ -33,92 +112,23 @@ class StatisticsView(QWidget):
         title_label = QLabel(self.title)
         self.layout.addWidget(title_label)
         for i, label in enumerate(group_labels):
-            group_name = f"Group {label+1}"
             group_name = self.parent.spot_ui.group_names[label]
             mean = means[:, i]
             std = stds[:, i]
-            frame = self.create_stat_frame(group_name, label, mean, std, i)
+            frame = StatisticsFrame(self.parent, label, group_name, mean, std)
+            self.frames.append(frame)
             self.layout.addWidget(frame)
         self.layout.addStretch()
 
         self.setUpdatesEnabled(True)
         self.update()
 
-    def create_stat_frame(self, group_name, group_label, mean, std, index):
-        """Creates a single-line frame with statistics for a group."""
-
-        rgb_color = color_palette[group_label]
-        color_str = f"rgb({rgb_color[0]}, {rgb_color[1]}, {rgb_color[2]})"
-
-        frame = QFrame()
-        frame.setFrameShape(QFrame.Box)
-        frame.setStyleSheet(
-            f"""
-            QFrame {{
-                background-color: #f4f4f4;
-                border: 2px solid {color_str}; 
-                border-radius: 4px;
-                padding: 5px;
-            }}
-            QLabel {{
-                font-size: 12px;
-                border: 1px solid gray;
-            }}
-        """
-        )
-
-        layout = QHBoxLayout()
-        layout.setContentsMargins(8, 2, 8, 2)  # Minimize inner padding
-        layout.setSpacing(15)  # Space between labels
-
-        title_label = QLabel(f"<b>{group_name}</b>")
-        title_label.setFixedWidth(80)  # Align group names
-
-        sig_digits = 3
-
-        self.diff = mean[2] - mean[1]
-        self.diff_std = sqrt(std[1] ** 2 + std[2] ** 2)
-
-        diff_label = QLabel(
-            f"<b>Diff 1:</b> {self.diff:.{sig_digits}g}±{self.diff_std:.{sig_digits}g}"
-        )
-
-        # Check if the difference is larger than 3 times the standard deviation
-        # check_label = QLabel()
-        # check_label.setText("✔️")  # Unicode checkmark
-        # if abs(self.diff) < 3 * self.diff_std:
-        #     check_label.setVisible(False)
-
-        # Store references to the QLabel widgets
-        self.label_references[index] = {
-            "diff_label": diff_label,
-        }
-
-        layout.addWidget(title_label)
-        # layout.addWidget(mean_label)
-        layout.addWidget(diff_label)
-        layout.addStretch()  # Push everything neatly to the left
-
-        frame.setLayout(layout)
-        return frame
-
     def updateMeans(self):
         means, stds = self.parent.extinction_ui.get_statistics()
-        for index, labels in self.label_references.items():
+        for index, frame in enumerate(self.frames):
             mean = means[:, index]
             std = stds[:, index]
-
-            sig_digits = 3
-            # labels["mean_label"].setText(f"{mean[0]:.3f}±{std[0]:.3f}")
-            self.diff = mean[2] - mean[1]
-            self.diff_std = sqrt(std[1] * std[1] + std[2] * std[2])
-            labels["diff_label"].setText(
-                f"<b>Diff R2 - R1:</b> {self.diff:.{sig_digits}g}±{self.diff_std:.{sig_digits}g}"
-            )
-            # if abs(self.diff) > 3 * self.diff_std:
-            #     labels["check_label"].setVisible(True)
-            # else:
-            #     labels["check_label"].setVisible(False)
+            frame.updateDiffs(mean, std)
 
     def getData(self):
         return self.diff, self.diff_std
