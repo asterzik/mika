@@ -75,56 +75,28 @@ class StatisticsView(QWidget):
         title_label.setFixedWidth(80)  # Align group names
 
         sig_digits = 3
-        mean_label = QLabel(f"{mean[0]:.{sig_digits}g}±{std[0]:.{sig_digits}g}")
-        mean_range1_label = QLabel(f"{mean[1]:.{sig_digits}g}±{std[1]:.{sig_digits}g}")
-        mean_range2_label = QLabel(f"{mean[2]:.{sig_digits}g}±{std[2]:.{sig_digits}g}")
 
         self.diff = mean[2] - mean[1]
         self.diff_std = sqrt(std[1] ** 2 + std[2] ** 2)
 
         diff_label = QLabel(
-            f"<b>Diff R2 - R1:</b> {self.diff:.{sig_digits}g}±{self.diff_std:.{sig_digits}g}"
+            f"<b>Diff 1:</b> {self.diff:.{sig_digits}g}±{self.diff_std:.{sig_digits}g}"
         )
 
         # Check if the difference is larger than 3 times the standard deviation
-        check_label = QLabel()
-        check_label.setText("✔️")  # Unicode checkmark
-        if abs(self.diff) < 3 * self.diff_std:
-            check_label.setVisible(False)
+        # check_label = QLabel()
+        # check_label.setText("✔️")  # Unicode checkmark
+        # if abs(self.diff) < 3 * self.diff_std:
+        #     check_label.setVisible(False)
 
         # Store references to the QLabel widgets
         self.label_references[index] = {
-            "mean_label": mean_label,
-            "mean_range1_label": mean_range1_label,
-            "mean_range2_label": mean_range2_label,
             "diff_label": diff_label,
-            "check_label": check_label,
         }
-
-        # Color the ranges widgets
-        mean_range1_color = time_color_palette[0]
-        mean_range1_label.setStyleSheet(
-            f"""
-            background-color: rgba({mean_range1_color[0]}, {mean_range1_color[1]}, {mean_range1_color[2]}, 30);
-            border: 3px solid {color_str};
-            border-style: dashed;
-            """
-        )
-
-        mean_range2_color = time_color_palette[1]
-        mean_range2_label.setStyleSheet(
-            f"""
-            background-color: rgba({mean_range2_color[0]}, {mean_range2_color[1]}, {mean_range2_color[2]}, 30);
-            border: 3px solid {color_str};
-            """
-        )
 
         layout.addWidget(title_label)
         # layout.addWidget(mean_label)
-        layout.addWidget(mean_range1_label)
-        layout.addWidget(mean_range2_label)
         layout.addWidget(diff_label)
-        layout.addWidget(check_label)
         layout.addStretch()  # Push everything neatly to the left
 
         frame.setLayout(layout)
@@ -138,21 +110,15 @@ class StatisticsView(QWidget):
 
             sig_digits = 3
             # labels["mean_label"].setText(f"{mean[0]:.3f}±{std[0]:.3f}")
-            labels["mean_range1_label"].setText(
-                f"{mean[1]:.{sig_digits}g}±{std[1]:.{sig_digits}g}"
-            )
-            labels["mean_range2_label"].setText(
-                f"{mean[2]:.{sig_digits}g}±{std[2]:.{sig_digits}g}"
-            )
             self.diff = mean[2] - mean[1]
             self.diff_std = sqrt(std[1] * std[1] + std[2] * std[2])
             labels["diff_label"].setText(
                 f"<b>Diff R2 - R1:</b> {self.diff:.{sig_digits}g}±{self.diff_std:.{sig_digits}g}"
             )
-            if abs(self.diff) > 3 * self.diff_std:
-                labels["check_label"].setVisible(True)
-            else:
-                labels["check_label"].setVisible(False)
+            # if abs(self.diff) > 3 * self.diff_std:
+            #     labels["check_label"].setVisible(True)
+            # else:
+            #     labels["check_label"].setVisible(False)
 
     def getData(self):
         return self.diff, self.diff_std
