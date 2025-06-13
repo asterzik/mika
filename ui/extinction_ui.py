@@ -765,27 +765,15 @@ class ExtinctionUi:
         return diff, diff_std
 
     def get_statistics(self):
-        # Calculate mean and std for range1
-        range1_means = np.mean(self.time_series_y[self.time_range_indices[0]], axis=0)
-        # Divide std by sample size to compute standard error of the mean
-        range1_std = np.std(
-            self.time_series_y[self.time_range_indices[0]], axis=0
-        ) / np.sqrt(len(self.time_range_indices[0]))
 
-        # Calculate mean and std for range2
-        range2_means = np.mean(self.time_series_y[self.time_range_indices[1]], axis=0)
-        range2_std = np.std(
-            self.time_series_y[self.time_range_indices[1]], axis=0
-        ) / np.sqrt(len(self.time_range_indices[1]))
-
-        # Calculate overall mean and std
-        mean = np.mean(self.time_series_y, axis=0)
-        std = np.std(self.time_series_y, axis=0) / np.sqrt(len(self.time_series_y))
-
-        # Stack all means and stds
-        means = np.vstack((mean, range1_means, range2_means))
-        stds = np.vstack((std, range1_std, range2_std))
-        return means, stds
+        means = []
+        sems = []
+        for range in self.time_range_indices:
+            mean = np.mean(self.time_series_y[range], axis=0)
+            sem = np.std(self.time_series_y[range], axis=0) / np.sqrt(len(range))
+            means.append(mean)
+            sems.append(sem)
+        return np.array(means), np.array(sems)
 
     def get_groups(self):
         return self.group_labels
