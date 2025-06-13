@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QFileDialog,
     QGroupBox,
+    QPushButton,
     QSizePolicy,
 )
 
@@ -32,25 +33,16 @@ class TimeSeries:
         self.time_indices = None
         self.time_labels = None
         self.group_labels = None
+        self.time_ranges = []
         self.curves = None
         self.time_controls_group_box = QGroupBox("Time Range Selection")
 
         # Add two time ranges for comparisons
+        self.add_time_region()
+        self.add_time_region()
 
-        color1 = QColor()
-        color1.setRgb(*time_color_palette[0])
-        color1.setAlpha(15)
-
-        color2 = QColor()
-        color2.setRgb(*time_color_palette[1])
-        color2.setAlpha(15)
-
-        self.time_region1 = pg.LinearRegionItem(
-            orientation="vertical", movable=True, brush=color1
-        )
-        self.time_region2 = pg.LinearRegionItem(
-            orientation="vertical", movable=True, brush=color2
-        )
+        self.time_region1 = self.time_ranges[0]
+        self.time_region2 = self.time_ranges[1]
 
         # Create spinboxes
         self.spinbox_region1_start = QSpinBox()
@@ -58,10 +50,13 @@ class TimeSeries:
         self.spinbox_region2_start = QSpinBox()
         self.spinbox_region2_end = QSpinBox()
 
-        # Layout the spinboxes somewhere in your UI
+        # Layout the spinboxes and add time range button in UI
         spinbox_layout = QVBoxLayout()
         s1_layout = QHBoxLayout()
         s2_layout = QHBoxLayout()
+        add_time_range_button = QPushButton("Add Time Range")
+        spinbox_layout.addWidget(add_time_range_button)
+        # add_time_range_button.clicked.connect(self.addTimeRange)
         s1_layout.addWidget(QLabel("Range 1:"))
         s1_layout.addWidget(self.spinbox_region1_start)
         s1_layout.addWidget(self.spinbox_region1_end)
@@ -100,6 +95,15 @@ class TimeSeries:
 
         self.time_region1.sigRegionChanged.connect(self.update_spinboxes)
         self.time_region2.sigRegionChanged.connect(self.update_spinboxes)
+
+    def add_time_region(self):
+        index = len(self.time_ranges)
+        region = pg.LinearRegionItem(
+            orientation="vertical",
+            movable=True,
+            brush=QColor(*time_color_palette[index], 15),
+        )
+        self.time_ranges.append(region)
 
     def update_spinboxes(self):
         r1 = self.time_region1.getRegion()
