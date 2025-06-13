@@ -36,6 +36,7 @@ class TimeSeries:
         self.time_ranges = []
         self.time_range_spinboxes = []
         self.time_range_sb_layouts = []
+        self.time_ranges_added = []
         self.curves = None
         self.time_controls_group_box = QGroupBox("Time Range Selection")
 
@@ -82,10 +83,11 @@ class TimeSeries:
             lambda: region.setRegion((start_spinbox.value(), end_spinbox.value()))
         )
         region.sigRegionChanged.connect(self.update_spinboxes)
+        self.time_ranges_added.append(False)
 
     def add_new_time_region(self):
         self.add_time_region()
-        self.draw()
+        self.addTimeRanges()
 
     def update_spinboxes(self):
         for range, (start_sb, end_sb) in zip(
@@ -167,35 +169,37 @@ class TimeSeries:
         self.addTimeRanges()
 
     def addTimeRanges(self):
-        for i, (range, (start_sb, end_sb)) in enumerate(
-            zip(self.time_ranges, self.time_range_spinboxes)
+        for i, (range, (start_sb, end_sb), added) in enumerate(
+            zip(self.time_ranges, self.time_range_spinboxes, self.time_ranges_added)
         ):
-            self.widget.addItem(range)
+            if not added:
+                self.widget.addItem(range)
 
-            # Determine start and end values for the time ranges
-            if i == 0:
-                # Store initial values
-                self.min_x = np.min(self.x_values)
-                self.max_x = np.max(self.x_values)
-                self.mid_x = (self.min_x + self.max_x) / 2
-                start = self.min_x
-                end = self.mid_x
-            elif i == 1:
-                start = self.mid_x
-                end = self.max_x
-            else:
-                # Set additional time ranges to 1/10th of the total range
-                start = self.min_x
-                end = self.min_x + (self.max_x - self.min_x) / 10
+                # Determine start and end values for the time ranges
+                if i == 0:
+                    # Store initial values
+                    self.min_x = np.min(self.x_values)
+                    self.max_x = np.max(self.x_values)
+                    self.mid_x = (self.min_x + self.max_x) / 2
+                    start = self.min_x
+                    end = self.mid_x
+                elif i == 1:
+                    start = self.mid_x
+                    end = self.max_x
+                else:
+                    # Set additional time ranges to 1/10th of the total range
+                    start = self.min_x
+                    end = self.min_x + (self.max_x - self.min_x) / 10
 
-            range.setRegion((start, end))
-            start_sb.setValue(start)
-            end_sb.setValue(end)
+                range.setRegion((start, end))
+                start_sb.setValue(start)
+                end_sb.setValue(end)
 
-            # Set spinbox properties
-            for sb in [start_sb, end_sb]:
-                sb.setRange(self.min_x, self.max_x)
-                sb.setSingleStep(1)
+                # Set spinbox properties
+                for sb in [start_sb, end_sb]:
+                    sb.setRange(self.min_x, self.max_x)
+                    sb.setSingleStep(1)
+                self.time_ranges_added[i] = True
 
     def export_time_series_to_csv(self, filename):
         # Prepare the data
