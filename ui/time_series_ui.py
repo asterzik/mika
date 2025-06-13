@@ -34,62 +34,21 @@ class TimeSeries:
         self.time_labels = None
         self.group_labels = None
         self.time_ranges = []
+        self.time_range_spinboxes = []
+        self.time_range_sb_layouts = []
         self.curves = None
         self.time_controls_group_box = QGroupBox("Time Range Selection")
+
+        # Layout the spinboxes and add time range button in UI
+        self.spinbox_layout = QVBoxLayout()
+        add_time_range_button = QPushButton("Add Time Range")
+        self.spinbox_layout.addWidget(add_time_range_button)
+
+        self.time_controls_group_box.setLayout(self.spinbox_layout)
 
         # Add two time ranges for comparisons
         self.add_time_region()
         self.add_time_region()
-
-        # Create spinboxes
-        self.spinbox_region1_start = QSpinBox()
-        self.spinbox_region1_end = QSpinBox()
-        self.spinbox_region2_start = QSpinBox()
-        self.spinbox_region2_end = QSpinBox()
-
-        # Layout the spinboxes and add time range button in UI
-        spinbox_layout = QVBoxLayout()
-        s1_layout = QHBoxLayout()
-        s2_layout = QHBoxLayout()
-        add_time_range_button = QPushButton("Add Time Range")
-        spinbox_layout.addWidget(add_time_range_button)
-        # add_time_range_button.clicked.connect(self.addTimeRange)
-        s1_layout.addWidget(QLabel("Range 1:"))
-        s1_layout.addWidget(self.spinbox_region1_start)
-        s1_layout.addWidget(self.spinbox_region1_end)
-        s2_layout.addWidget(QLabel("Range 2:"))
-        s2_layout.addWidget(self.spinbox_region2_start)
-        s2_layout.addWidget(self.spinbox_region2_end)
-        spinbox_layout.addLayout(s1_layout)
-        spinbox_layout.addLayout(s2_layout)
-
-        self.time_controls_group_box.setLayout(spinbox_layout)
-        # self.parent.layout().addWidget(self.time_controls_widget)  # Add to your UI layout
-
-        # Connect spinbox -> region
-        self.spinbox_region1_start.valueChanged.connect(
-            lambda: self.time_ranges[0].setRegion(
-                (self.spinbox_region1_start.value(), self.spinbox_region1_end.value())
-            )
-        )
-        self.spinbox_region1_end.valueChanged.connect(
-            lambda: self.time_ranges[0].setRegion(
-                (self.spinbox_region1_start.value(), self.spinbox_region1_end.value())
-            )
-        )
-        self.spinbox_region2_start.valueChanged.connect(
-            lambda: self.time_ranges[1].setRegion(
-                (self.spinbox_region2_start.value(), self.spinbox_region2_end.value())
-            )
-        )
-        self.spinbox_region2_end.valueChanged.connect(
-            lambda: self.time_ranges[1].setRegion(
-                (self.spinbox_region2_start.value(), self.spinbox_region2_end.value())
-            )
-        )
-
-        for region in self.time_ranges:
-            region.sigRegionChanged.connect(self.update_spinboxes)
 
     def add_time_region(self):
         index = len(self.time_ranges)
@@ -100,21 +59,40 @@ class TimeSeries:
         )
         self.time_ranges.append(region)
 
+        # Create spinboxes
+        start_spinbox = QSpinBox()
+        end_spinbox = QSpinBox()
+
+        self.time_range_spinboxes.append((start_spinbox, end_spinbox))
+
+        layout = QHBoxLayout()
+
+        layout.addWidget(QLabel(f"Range {index}:"))
+        layout.addWidget(start_spinbox)
+        layout.addWidget(end_spinbox)
+        self.time_range_sb_layouts.append(layout)
+        self.spinbox_layout.addLayout(layout)
+
+        # Connect spinbox -> region
+        start_spinbox.valueChanged.connect(
+            lambda: region.setRegion((start_spinbox.value(), end_spinbox.value()))
+        )
+        end_spinbox.valueChanged.connect(
+            lambda: region.setRegion((start_spinbox.value(), end_spinbox.value()))
+        )
+        region.sigRegionChanged.connect(self.update_spinboxes)
+
     def update_spinboxes(self):
-        r1 = self.time_ranges[0].getRegion()
-        r2 = self.time_ranges[1].getRegion()
-        self.spinbox_region1_start.blockSignals(True)
-        self.spinbox_region1_end.blockSignals(True)
-        self.spinbox_region2_start.blockSignals(True)
-        self.spinbox_region2_end.blockSignals(True)
-        self.spinbox_region1_start.setValue(r1[0])
-        self.spinbox_region1_end.setValue(r1[1])
-        self.spinbox_region2_start.setValue(r2[0])
-        self.spinbox_region2_end.setValue(r2[1])
-        self.spinbox_region1_start.blockSignals(False)
-        self.spinbox_region1_end.blockSignals(False)
-        self.spinbox_region2_start.blockSignals(False)
-        self.spinbox_region2_end.blockSignals(False)
+        for range, (start_sb, end_sb) in zip(
+            self.time_ranges, self.time_range_spinboxes
+        ):
+            r = range.getRegion()
+            start_sb.blockSignals(True)
+            end_sb.blockSignals(True)
+            start_sb.setValue(r[0])
+            end_sb.setValue(r[1])
+            start_sb.blockSignals(False)
+            end_sb.blockSignals(False)
 
         self.parent.extinction_ui.updateTimeRanges()
         self.parent.extinction_ui.updateCurvesData()
@@ -184,31 +162,30 @@ class TimeSeries:
         self.addTimeRanges()
 
     def addTimeRanges(self):
-        for region in self.time_ranges:
-            self.widget.addItem(region)
-        # Store initial values
-        self.min_x = np.min(self.x_values)
-        self.max_x = np.max(self.x_values)
-        mid_x = (self.min_x + self.max_x) / 2
+        for i, (range, (start_sb, end_sb)) in enumerate(
+            zip(self.time_ranges, self.time_range_spinboxes)
+        ):
+            self.widget.addItem(range)
 
-        # Set initial regions
-        self.time_ranges[0].setRegion((self.min_x, mid_x))
-        self.time_ranges[1].setRegion((mid_x, self.max_x))
+            # Specifically handle first two ranges
+            if i == 0 or i == 1:
+                # Store initial values
+                self.min_x = np.min(self.x_values)
+                self.max_x = np.max(self.x_values)
+                mid_x = (self.min_x + self.max_x) / 2
+            if i == 0:
+                range.setRegion((self.min_x, mid_x))
+                start_sb.setValue(self.min_x)
+                end_sb.setValue(mid_x)
+            elif i == 1:
+                range.setRegion((mid_x, self.max_x))
+                start_sb.setValue(mid_x)
+                end_sb.setValue(self.max_x)
 
-        for sb in [
-            self.spinbox_region1_start,
-            self.spinbox_region1_end,
-            self.spinbox_region2_start,
-            self.spinbox_region2_end,
-        ]:
-            sb.setRange(self.min_x, self.max_x)
-            sb.setSingleStep(1)
-
-        # Set initial values
-        self.spinbox_region1_start.setValue(self.min_x)
-        self.spinbox_region1_end.setValue(mid_x)
-        self.spinbox_region2_start.setValue(mid_x)
-        self.spinbox_region2_end.setValue(self.max_x)
+            # Set spinbox properties
+            for sb in [start_sb, end_sb]:
+                sb.setRange(self.min_x, self.max_x)
+                sb.setSingleStep(1)
 
     def export_time_series_to_csv(self, filename):
         # Prepare the data
