@@ -740,15 +740,18 @@ class ExtinctionUi:
         return self.time_series_x, self.time_series_y
 
     def updateTimeRanges(self):
-        range1 = self.parent.time_series.time_region1.getRegion()
-        # Calculate indices of time_series_x that are within range1
-        self.time_range1_indices = np.where(
-            (self.time_series_x >= range1[0]) & (self.time_series_x <= range1[1])
-        )[0]
-        range2 = self.parent.time_series.time_region2.getRegion()
-        self.time_range2_indices = np.where(
-            (self.time_series_x >= range2[0]) & (self.time_series_x <= range2[1])
-        )[0]
+        for i, range in enumerate(self.parent.time_series.time_ranges):
+            region = range.getRegion()
+            if i == 0:
+                self.time_range1_indices = np.where(
+                    (self.time_series_x >= region[0])
+                    & (self.time_series_x <= region[1])
+                )[0]
+            elif i == 1:
+                self.time_range2_indices = np.where(
+                    (self.time_series_x >= region[0])
+                    & (self.time_series_x <= region[1])
+                )[0]
 
     def get_diff_and_std(self):
         if self.individual_metric is None:

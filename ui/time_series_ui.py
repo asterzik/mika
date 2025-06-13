@@ -41,9 +41,6 @@ class TimeSeries:
         self.add_time_region()
         self.add_time_region()
 
-        self.time_region1 = self.time_ranges[0]
-        self.time_region2 = self.time_ranges[1]
-
         # Create spinboxes
         self.spinbox_region1_start = QSpinBox()
         self.spinbox_region1_end = QSpinBox()
@@ -71,30 +68,28 @@ class TimeSeries:
 
         # Connect spinbox -> region
         self.spinbox_region1_start.valueChanged.connect(
-            lambda: self.time_region1.setRegion(
+            lambda: self.time_ranges[0].setRegion(
                 (self.spinbox_region1_start.value(), self.spinbox_region1_end.value())
             )
         )
         self.spinbox_region1_end.valueChanged.connect(
-            lambda: self.time_region1.setRegion(
+            lambda: self.time_ranges[0].setRegion(
                 (self.spinbox_region1_start.value(), self.spinbox_region1_end.value())
             )
         )
         self.spinbox_region2_start.valueChanged.connect(
-            lambda: self.time_region2.setRegion(
+            lambda: self.time_ranges[1].setRegion(
                 (self.spinbox_region2_start.value(), self.spinbox_region2_end.value())
             )
         )
         self.spinbox_region2_end.valueChanged.connect(
-            lambda: self.time_region2.setRegion(
+            lambda: self.time_ranges[1].setRegion(
                 (self.spinbox_region2_start.value(), self.spinbox_region2_end.value())
             )
         )
 
-        # Connect region -> spinbox
-
-        self.time_region1.sigRegionChanged.connect(self.update_spinboxes)
-        self.time_region2.sigRegionChanged.connect(self.update_spinboxes)
+        for region in self.time_ranges:
+            region.sigRegionChanged.connect(self.update_spinboxes)
 
     def add_time_region(self):
         index = len(self.time_ranges)
@@ -106,8 +101,8 @@ class TimeSeries:
         self.time_ranges.append(region)
 
     def update_spinboxes(self):
-        r1 = self.time_region1.getRegion()
-        r2 = self.time_region2.getRegion()
+        r1 = self.time_ranges[0].getRegion()
+        r2 = self.time_ranges[1].getRegion()
         self.spinbox_region1_start.blockSignals(True)
         self.spinbox_region1_end.blockSignals(True)
         self.spinbox_region2_start.blockSignals(True)
@@ -189,16 +184,16 @@ class TimeSeries:
         self.addTimeRanges()
 
     def addTimeRanges(self):
-        self.widget.addItem(self.time_region1)
-        self.widget.addItem(self.time_region2)
+        for region in self.time_ranges:
+            self.widget.addItem(region)
         # Store initial values
         self.min_x = np.min(self.x_values)
         self.max_x = np.max(self.x_values)
         mid_x = (self.min_x + self.max_x) / 2
 
         # Set initial regions
-        self.time_region1.setRegion((self.min_x, mid_x))
-        self.time_region2.setRegion((mid_x, self.max_x))
+        self.time_ranges[0].setRegion((self.min_x, mid_x))
+        self.time_ranges[1].setRegion((mid_x, self.max_x))
 
         for sb in [
             self.spinbox_region1_start,
@@ -214,23 +209,6 @@ class TimeSeries:
         self.spinbox_region1_end.setValue(mid_x)
         self.spinbox_region2_start.setValue(mid_x)
         self.spinbox_region2_end.setValue(self.max_x)
-
-        # self.time_region1.setRegion((min_x, np.floor(max_x / 2)))
-        # self.widget.addItem(self.time_region1)
-
-        # def on_time_region_change():
-        #     self.parent.extinction_ui.updateTimeRanges()
-        #     self.parent.extinction_ui.updateCurvesData()
-        #     self.parent.statistics_view.updateMeans()
-
-        # self.time_region1.sigRegionChangeFinished.connect(on_time_region_change)
-
-        # self.time_region2.setRegion((np.ceil((max_x / 2)), max_x))
-        # min_x = np.min(self.x_values)
-        # max_x = np.max(self.x_values)
-
-        # self.time_region2.sigRegionChangeFinished.connect(on_time_region_change)
-        # self.widget.addItem(self.time_region2)
 
     def export_time_series_to_csv(self, filename):
         # Prepare the data
