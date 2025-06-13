@@ -37,6 +37,10 @@ class RegressorType(Enum):
     GP = "GP"
 
 
+# TODO do something smarter here
+max_num_time_ranges = 20
+
+
 def individualRegression(f, i, wavelengths, extinction, regressor_type, poly_degree):
     x = wavelengths[f]
     y = extinction[f, :, i]
@@ -370,31 +374,18 @@ class ExtinctionUi:
     def plot_average_over_time(self, spot_index, group_index, spot_label):
         # Create and add plot line
         spot_color = color_palette[spot_label]
-        pen1 = pg.mkPen(color=QColor(*spot_color), width=3, style=pg.QtCore.Qt.DashLine)
-        pen2 = pg.mkPen(color=QColor(*spot_color), width=3)
 
-        # Fit and plot for both time ranges
-
-        x_plot, y_plot = self.compute_average_over_time(
-            self.time_range_indices[0], spot_index
-        )
-        line = pg.PlotDataItem(x_plot, y_plot, pen=pen1, symbol=None)
-        self.plot_widget.addItem(line)
-        self.time_average_curves[0, spot_index] = line
-
-        x_plot, y_plot = self.compute_average_over_time(
-            self.time_range_indices[1], spot_index
-        )
-        line = pg.PlotDataItem(x_plot, y_plot, pen=pen2, symbol=None)
-        self.plot_widget.addItem(line)
-        self.time_average_curves[1, spot_index] = line
+        for i, time_range in enumerate(self.time_range_indices):
+            pen = pg.mkPen(color=QColor(*spot_color), width=3)
+            x_plot, y_plot = self.compute_average_over_time(time_range, spot_index)
+            line = pg.PlotDataItem(x_plot, y_plot, pen=pen, symbol=None)
+            self.plot_widget.addItem(line)
+            self.time_average_curves[i, spot_index] = line
 
     def updateAverageOverTime(self, group_index):
-        x, y = self.compute_average_over_time(self.time_range_indices[0], group_index)
-        self.time_average_curves[0, group_index].setData(x, y)
-
-        x, y = self.compute_average_over_time(self.time_range_indices[1], group_index)
-        self.time_average_curves[1, group_index].setData(x, y)
+        for i, time_range in enumerate(self.time_range_indices):
+            x, y = self.compute_average_over_time(time_range, group_index)
+            self.time_average_curves[i, group_index].setData(x, y)
 
     def toggle_time_average(self):
         self.draw()
@@ -619,12 +610,16 @@ class ExtinctionUi:
         if self.average_time_checkbox.isChecked():
             if self.average_first_radio.isChecked():
                 self.updateTimeRanges()
-                self.time_average_curves = np.empty((2, self.num_groups), dtype=object)
+                self.time_average_curves = np.empty(
+                    (max_num_time_ranges, self.num_groups), dtype=object
+                )
                 for group_index, group_label in enumerate(self.group_labels):
                     self.plot_average_over_time(group_index, group_index, group_label)
             else:
                 self.updateTimeRanges()
-                self.time_average_curves = np.empty((2, self.num_spots), dtype=object)
+                self.time_average_curves = np.empty(
+                    (max_num_time_ranges, self.num_spots), dtype=object
+                )
                 for group_index, group_label in enumerate(self.group_labels):
                     for spot_index, spot_labels in enumerate(self.selected_spot_labels):
                         if group_label in spot_labels:

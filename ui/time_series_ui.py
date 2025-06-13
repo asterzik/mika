@@ -86,6 +86,7 @@ class TimeSeries:
         self.time_ranges_added.append(False)
         if index > 1:
             self.parent.extinction_ui.updateTimeRanges()
+            self.parent.extinction_ui.draw()
             self.parent.statistics_view.updateMeans()
 
     def add_new_time_region(self):
