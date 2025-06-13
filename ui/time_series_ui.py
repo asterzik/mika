@@ -42,6 +42,7 @@ class TimeSeries:
         # Layout the spinboxes and add time range button in UI
         self.spinbox_layout = QVBoxLayout()
         add_time_range_button = QPushButton("Add Time Range")
+        add_time_range_button.clicked.connect(self.add_new_time_region)
         self.spinbox_layout.addWidget(add_time_range_button)
 
         self.time_controls_group_box.setLayout(self.spinbox_layout)
@@ -55,7 +56,7 @@ class TimeSeries:
         region = pg.LinearRegionItem(
             orientation="vertical",
             movable=True,
-            brush=QColor(*time_color_palette[index], 15),
+            brush=QColor(*time_color_palette[index % len(time_color_palette)], 15),
         )
         self.time_ranges.append(region)
 
@@ -81,6 +82,10 @@ class TimeSeries:
             lambda: region.setRegion((start_spinbox.value(), end_spinbox.value()))
         )
         region.sigRegionChanged.connect(self.update_spinboxes)
+
+    def add_new_time_region(self):
+        self.add_time_region()
+        self.draw()
 
     def update_spinboxes(self):
         for range, (start_sb, end_sb) in zip(
@@ -167,20 +172,25 @@ class TimeSeries:
         ):
             self.widget.addItem(range)
 
-            # Specifically handle first two ranges
-            if i == 0 or i == 1:
+            # Determine start and end values for the time ranges
+            if i == 0:
                 # Store initial values
                 self.min_x = np.min(self.x_values)
                 self.max_x = np.max(self.x_values)
-                mid_x = (self.min_x + self.max_x) / 2
-            if i == 0:
-                range.setRegion((self.min_x, mid_x))
-                start_sb.setValue(self.min_x)
-                end_sb.setValue(mid_x)
+                self.mid_x = (self.min_x + self.max_x) / 2
+                start = self.min_x
+                end = self.mid_x
             elif i == 1:
-                range.setRegion((mid_x, self.max_x))
-                start_sb.setValue(mid_x)
-                end_sb.setValue(self.max_x)
+                start = self.mid_x
+                end = self.max_x
+            else:
+                # Set additional time ranges to 1/10th of the total range
+                start = self.min_x
+                end = self.min_x + (self.max_x - self.min_x) / 10
+
+            range.setRegion((start, end))
+            start_sb.setValue(start)
+            end_sb.setValue(end)
 
             # Set spinbox properties
             for sb in [start_sb, end_sb]:
