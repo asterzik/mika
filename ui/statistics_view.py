@@ -72,7 +72,7 @@ class StatisticsFrame(QFrame):
         self.layout.addWidget(diff_label)
         self.diff_labels.append(diff_label)
 
-    def updateDiffs(self, means, stds):
+    def updateData(self, means, stds):
         self.means = means
         self.stds = stds
         self.diff = np.zeros(len(self.means) - 1)
@@ -85,6 +85,8 @@ class StatisticsFrame(QFrame):
             if i == 0:
                 continue
             self.diff_std[i - 1] = sqrt(std**2 + self.stds[0] ** 2)
+
+    def updateDiffLabels(self):
         for i, diff_label in enumerate(self.diff_labels):
             diff_label.setText(
                 f"<b>Diff {i + 1}:</b> {self.diff[i]:.{self.sig_digits}g}±{self.diff_std[i]:.{self.sig_digits}g}"
@@ -146,7 +148,11 @@ class StatisticsView(QWidget):
         for index, frame in enumerate(self.frames):
             mean = means[:, index]
             std = stds[:, index]
-            frame.updateDiffs(mean, std)
+            to_add = len(mean) - len(frame.means)
+            frame.updateData(mean, std)
+            for i in range(to_add):
+                frame.addDiffLabel()
+            frame.updateDiffLabels()
 
     def getData(self):
         return self.diff, self.diff_std
