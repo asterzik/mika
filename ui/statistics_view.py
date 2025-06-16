@@ -92,6 +92,13 @@ class StatisticsFrame(QFrame):
                 f"<b>Diff {i + 1}:</b> {self.diff[i]:.{self.sig_digits}g}±{self.diff_std[i]:.{self.sig_digits}g}"
             )
 
+    def updateDiffColors(self):
+        for i, diff_label in enumerate(self.diff_labels):
+            color = (int)((i + 1) * (255 / (len(self.diff_labels))))
+            diff_label.setStyleSheet(
+                f"border: 2px solid rgb({color}, {color}, {color})"
+            )
+
     def clear(self):
         while self.layout.count():
             item = self.layout.takeAt(0)
@@ -156,3 +163,7 @@ class StatisticsView(QWidget):
 
     def getData(self):
         return self.diff, self.diff_std
+
+    def updateDiffColors(self):
+        for index, frame in enumerate(self.frames):
+            frame.updateDiffColors()

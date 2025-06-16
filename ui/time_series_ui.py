@@ -3,7 +3,7 @@ import numpy as np
 import os
 import csv
 
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QPen
 
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -58,11 +58,15 @@ class TimeSeries:
 
     def add_time_region(self):
         index = len(self.time_ranges)
+        # Set fully opaque border (line) color
+
         region = pg.LinearRegionItem(
             orientation="vertical",
             movable=True,
-            brush=QColor(*time_color_palette[index % len(time_color_palette)], 15),
+            brush=QColor(230, 230, 230, 230),
         )
+
+        region.setZValue(-1)
         self.time_ranges.append(region)
 
         # Create spinboxes
@@ -89,6 +93,27 @@ class TimeSeries:
         )
         region.sigRegionChanged.connect(self.update_spinboxes)
         self.time_ranges_added.append(False)
+
+        for i, (region, (start_sb, end_sb)) in enumerate(
+            zip(self.time_ranges, self.time_range_spinboxes)
+        ):
+            color = 0
+            if i != 0:
+                color = i * (255 / (len(self.time_ranges) - 1))
+            pen = QPen(QColor(color, color, color))
+            pen.setWidth(5)
+            pen.setCosmetic(True)
+            region.lines[0].setPen(pen)
+            region.lines[1].setPen(pen)
+
+            style = f"""
+                QSpinBox {{
+                    border: 2px solid rgb({color}, {color}, {color});    
+                }}
+                """
+            start_sb.setStyleSheet(style)
+            end_sb.setStyleSheet(style)
+
         if index > 1:
             self.parent.extinction_ui.updateTimeRanges()
             self.parent.extinction_ui.draw()
@@ -199,6 +224,7 @@ class TimeSeries:
                     for sb in [start_sb, end_sb]:
                         sb.setRange(self.min_x, self.max_x)
                         sb.setSingleStep(1)
+        self.parent.statistics_view.updateDiffColors()
 
     def export_time_series_to_csv(self, filename):
         # Prepare the data

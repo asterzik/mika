@@ -86,9 +86,9 @@ class MainWindow(QMainWindow):
         self.spot_ui = SpotDetectionUi(self.path, self)
         self.spot_selection_ui = SpotSelectionUi(self.path, self)
         self.extinction_ui = ExtinctionUi(self)
-        self.time_series = TimeSeries(self)
         # Simulated statistics data (you would replace this with actual calculations)
         self.statistics_view = StatisticsView(self)
+        self.time_series = TimeSeries(self)
 
         self.results_view = ResultsView(self)
 
