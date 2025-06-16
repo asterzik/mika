@@ -12,7 +12,8 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QSizePolicy,
 )
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QPen
+from PySide6.QtCore import Qt
 import pyqtgraph as pg
 import numpy as np
 import csv
@@ -379,6 +380,7 @@ class ExtinctionUi:
             pen = pg.mkPen(color=QColor(*spot_color), width=3)
             x_plot, y_plot = self.compute_average_over_time(time_range, spot_index)
             line = pg.PlotDataItem(x_plot, y_plot, pen=pen, symbol=None)
+            line.setZValue(-1 * i)
             self.plot_widget.addItem(line)
             self.time_average_curves[i, spot_index] = line
 
@@ -651,6 +653,7 @@ class ExtinctionUi:
                                     group_index,
                                     group_label,
                                 )
+        self.updateCurveColors()
 
         # Plot Maxima
         self.scatter_maxima = pg.ScatterPlotItem()
@@ -729,6 +732,38 @@ class ExtinctionUi:
                         self.updateCurveData(time, spot_index)
 
         self.updateMaxima()
+
+    def updateCurveColors(self):
+        if self.average_first_radio.isChecked():
+            for group_index in range(self.num_groups):
+                if self.average_time_checkbox.isChecked():
+                    for i, time_range in enumerate(self.time_range_indices):
+                        if i != 0:
+                            original_pen = self.time_average_curves[i][
+                                group_index
+                            ].opts["pen"]
+                            pen = QPen(original_pen)
+                            dash_length = 4
+                            gap_length = 1 + int(
+                                (i / (len(self.time_range_indices) - 1)) * 10
+                            )
+                            pen.setDashPattern([dash_length, gap_length])
+                            self.time_average_curves[i][group_index].setPen(pen)
+        else:
+            for spot_index in range(self.num_spots):
+                if self.average_time_checkbox.isChecked():
+                    for i, time_range in enumerate(self.time_range_indices):
+                        if i != 0:
+                            original_pen = self.time_average_curves[i][spot_index].opts[
+                                "pen"
+                            ]
+                            pen = QPen(original_pen)
+                            dash_length = 4
+                            gap_length = 1 + int(
+                                (i / (len(self.time_range_indices) - 1)) * 10
+                            )
+                            pen.setDashPattern([dash_length, gap_length])
+                            self.time_average_curves[i][spot_index].setPen(pen)
 
     def get_time_series(self):
         return self.time_series_x, self.time_series_y

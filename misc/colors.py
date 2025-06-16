@@ -1,4 +1,4 @@
-# RGB Color Palette normal 12 from https://tsitsul.in/blog/coloropt/
+# RGB Color Palette. At som point I think I got it from here, but I must have modified it: https://tsitsul.in/blog/coloropt/
 color_palette = [
     (184, 0, 88),
     (0, 140, 249),

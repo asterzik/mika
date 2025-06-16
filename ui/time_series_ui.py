@@ -225,6 +225,7 @@ class TimeSeries:
                         sb.setRange(self.min_x, self.max_x)
                         sb.setSingleStep(1)
         self.parent.statistics_view.updateDiffColors()
+        self.parent.extinction_ui.updateCurveColors()
 
     def export_time_series_to_csv(self, filename):
         # Prepare the data
