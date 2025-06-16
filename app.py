@@ -37,6 +37,7 @@ import os
 default_path = (
     "/media/sd/mika/data/LED/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
 )
+# default_path = "/media/sd/mika/data/comparison/LSPRi/data2/"
 
 
 class MainWindow(QMainWindow):
@@ -215,9 +216,10 @@ class MainWindow(QMainWindow):
         # with ProfileContext("start_analysis.prof"):
         if self.spot_ui.circles.selected_spots == []:
             self.spot_ui.circles.select_all_spots(self.spot_ui.interactive_image)
-        if self.spot_selection_changed:
+        if self.spot_selection_changed or not self.spot_ui.circles.extinction_bool:
             self.extinction_ui.computeEverything()
             self.extinction_ui.draw()
+            self.time_series.reset_added()
             self.time_series.draw()
             means, stds = self.extinction_ui.get_statistics()
             group_labels = self.extinction_ui.get_groups()
