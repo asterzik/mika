@@ -441,16 +441,55 @@ class Circles:
                 continue
             index_wavelength = unique_wl.tolist().index(wl)
             image = self.images[index_wavelength * len(unique_frames) + index_frame]
-            max_val = max(np.max(image), np.max(highest_contrast_image))
-            image = np.clip(image, 0, max_val)
-            image = (image / max_val).astype(np.float32)
-            highest_contrast_image = np.clip(highest_contrast_image, 0, max_val)
-            highest_contrast_image = (highest_contrast_image / max_val).astype(
-                np.float32
+
+            # 2. Downsample Spatially and Convert to 8-bit (uint8)
+            # This step also handles implicit intensity scaling to 0-255 based on current data range
+            # or a global max if you prefer a fixed scaling (see notes below).
+            downsample_factor = 4  # Experiment with this value (2, 4, 8, etc.)
+
+            # It's often robust to find the max intensity *after* grayscaling but *before* downsampling
+            # to ensure consistent 8-bit conversion.
+            current_max_intensity = max(np.max(highest_contrast_image), np.max(image))
+            if current_max_intensity == 0:
+                current_max_intensity = 1  # Avoid division by zero, though a completely black image won't correlate.
+
+            # Scale to 0-255 and convert to uint8 before resizing
+            # This is where the bit-depth reduction happens.
+            ref_8bit = (highest_contrast_image / current_max_intensity * 255).astype(
+                np.uint8
+            )
+            cur_8bit = (image / current_max_intensity * 255).astype(np.uint8)
+
+            # Calculate new dimensions for spatial downsampling
+            original_h, original_w = ref_8bit.shape
+            new_w, new_h = (
+                original_w // downsample_factor,
+                original_h // downsample_factor,
             )
 
-            shift, _ = cv2.phaseCorrelate(highest_contrast_image, image)
-            self.shifts[index_wavelength] = shift
+            # Perform spatial downsampling
+            downsampled_ref = cv2.resize(
+                ref_8bit, (new_w, new_h), interpolation=cv2.INTER_AREA
+            )
+            downsampled_cur = cv2.resize(
+                cur_8bit, (new_w, new_h), interpolation=cv2.INTER_AREA
+            )
+
+            # 3. Convert to float32 for cv2.phaseCorrelate
+            # This is the final type conversion required by the function.
+            ref_for_corr = downsampled_ref.astype(np.float32)
+            cur_for_corr = downsampled_cur.astype(np.float32)
+
+            # Compute shift
+            shift_downsampled, _ = cv2.phaseCorrelate(ref_for_corr, cur_for_corr)
+
+            # Scale the shift back up to the original resolution
+            actual_shift = (
+                shift_downsampled[0] * downsample_factor,
+                shift_downsampled[1] * downsample_factor,
+            )
+
+            self.shifts[index_wavelength] = actual_shift
 
         num_repeats = int(len(self.frames) / len(unique_frames))
         self.frames = np.tile(unique_frames, num_repeats).tolist()
