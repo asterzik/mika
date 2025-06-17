@@ -441,6 +441,13 @@ class Circles:
                 continue
             index_wavelength = unique_wl.tolist().index(wl)
             image = self.images[index_wavelength * len(unique_frames) + index_frame]
+            max_val = max(np.max(image), np.max(highest_contrast_image))
+            image = np.clip(image, 0, max_val)
+            image = (image / max_val).astype(np.float32)
+            highest_contrast_image = np.clip(highest_contrast_image, 0, max_val)
+            highest_contrast_image = (highest_contrast_image / max_val).astype(
+                np.float32
+            )
 
             shift, _ = cv2.phaseCorrelate(highest_contrast_image, image)
             self.shifts[index_wavelength] = shift
