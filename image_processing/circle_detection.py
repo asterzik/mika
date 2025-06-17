@@ -16,10 +16,37 @@ import re
 import time
 
 import math
+import concurrent.futures
 
 
 # TODO make that changeable in the GUI
 trim_percentage = 0.05
+
+PATTERNS = [
+    (0, re.compile(r"(\d+)_(\d+)")),  # Format 1
+    (1, re.compile(r"imageAtLED(\d+)Frame(\d+)")),  # Format 2
+    (2, re.compile(r"imLCTFatWL(\d+)Frame(\d+)")),  # Format 3
+]
+
+
+def extract_wl_frame(filename):
+    filename, _ = filename.split(".")  # Remove file extension
+
+    for i, pattern in PATTERNS:
+        match = pattern.search(filename)
+        if match:
+            wl, frame = match.groups()
+            # Check if the files were generated with a LED device and convert LED indices to wavelengths
+            if i == 0:
+                mapping = [470, 500, 530, 590, 615, 660]
+                wl = mapping[int(wl)]
+            if i == 1:
+                mapping = [470, 500, 530, 560, 590, 615, 660]
+                wl = mapping[int(wl)]
+
+            return int(wl), int(frame)
+
+    raise ValueError(f"Pattern not implemented yet for filename: {filename}")
 
 
 def calculate_mean_intensity(
@@ -293,29 +320,6 @@ class Circles:
         grouped_images = {}
 
         # TODO Get the pattern extraction right, when they decided on a format
-        def extract_wl_frame(filename):
-            filename, _ = filename.split(".")  # Remove file extension
-            patterns = [
-                re.compile(r"(\d+)_(\d+)"),  # Format 1
-                re.compile(r"imageAtLED(\d+)Frame(\d+)"),  # Format 2
-                re.compile(r"imLCTFatWL(\d+)Frame(\d+)"),  # Format 3
-            ]
-
-            for i, pattern in enumerate(patterns):
-                match = pattern.search(filename)
-                if match:
-                    wl, frame = match.groups()
-                    # Check if the files were generated with a LED device and convert LED indices to wavelengths
-                    if i == 0:
-                        mapping = [470, 500, 530, 590, 615, 660]
-                        wl = mapping[int(wl)]
-                    if i == 1:
-                        mapping = [470, 500, 530, 560, 590, 615, 660]
-                        wl = mapping[int(wl)]
-
-                    return int(wl), int(frame)
-
-            raise ValueError(f"Pattern not implemented yet for filename: {filename}")
 
         # Group images by frame
         for image_name in self.image_names:
