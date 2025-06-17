@@ -49,6 +49,23 @@ def extract_wl_frame(filename):
     raise ValueError(f"Pattern not implemented yet for filename: {filename}")
 
 
+def process_image(image_name, image_path):
+    w, f = extract_wl_frame(image_name)
+    img_path = os.path.join(image_path, image_name)
+    image_raw = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+
+    if image_raw is None:
+        raise ValueError(f"Failed to load image: {image_name}")
+
+    image = image_raw.astype(np.float32)
+    if image.ndim == 3:
+        image = cv2.cvtColor(
+            image, cv2.COLOR_BGRA2GRAY if image.shape[2] == 4 else cv2.COLOR_BGR2GRAY
+        )
+
+    return f, (w, image, image_name)
+
+
 def calculate_mean_intensity(
     image, mask, denoising_method, lower_threshold, upper_threshold
 ):
@@ -313,77 +330,28 @@ class Circles:
             for f in os.listdir(image_path)
             if f.endswith((".png", ".jpg", ".jpeg", ".tiff"))
         ]
+        if not self.image_names:
+            QMessageBox.warning(
+                self, "Warning", "No image files found in the selected folder."
+            )
+            return
 
         # Initialize lists for wavelengths, frames, and a dictionary for grouped images
         self.wavelengths = []
         self.frames = []
         grouped_images = {}
 
-        # TODO Get the pattern extraction right, when they decided on a format
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = list(
+                executor.map(
+                    lambda img: process_image(img, image_path), self.image_names
+                )
+            )
 
-        # Group images by frame
-        for image_name in self.image_names:
-            w, f = extract_wl_frame(
-                image_name
-            )  # Extract wavelength and frame using regex
-            wavelength = int(w)
-            frame = int(f)
-
-            # Append wavelength and frame to respective lists
+        for frame, (wavelength, image, image_name) in futures:
             self.wavelengths.append(wavelength)
             self.frames.append(frame)
-
-            # Initialize a new list for the frame if it's not already in grouped_images
-            if frame not in grouped_images:
-                grouped_images[frame] = []
-
-            # Load the grayscale image
-            # image = cv2.imread(
-            #     os.path.join(image_path, image_name), cv2.IMREAD_GRAYSCALE
-            # )
-            # image = cv2.imread(
-            #     os.path.join(image_path, image_name), cv2.IMREAD_UNCHANGED
-            # )
-            # if image is None:
-            #     raise ValueError(f"Failed to load image: {image_name}")
-            # if image.ndim == 3:
-            #     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-            image_raw = cv2.imread(
-                os.path.join(image_path, image_name), cv2.IMREAD_UNCHANGED
-            )
-
-            if image_raw is None:
-                raise ValueError(
-                    f"Failed to load image: {image_name}. Check file path and integrity."
-                )
-
-            # Convert the image to float32 immediately to preserve precision.
-            # This handles both 8-bit and higher bit-depth images (e.g., 16-bit TIFFs)
-            # and ensures subsequent operations are done with higher precision.
-            image_float = image_raw.astype(np.float32)
-
-            # If the image was loaded as a color image (e.g., BGR, BGRA), convert it to grayscale.
-            # This conversion will now operate on float32 data, resulting in a float32 grayscale image.
-            if image_float.ndim == 3:
-                # Check for alpha channel (4 channels)
-                if image_float.shape[2] == 4:
-                    image = cv2.cvtColor(image_float, cv2.COLOR_BGRA2GRAY)
-                else:  # Assume BGR (3 channels)
-                    image = cv2.cvtColor(image_float, cv2.COLOR_BGR2GRAY)
-            else:
-                # Image was already grayscale (2D array)
-                image = image_float
-
-            # Append the (wavelength, image, image_name) tuple to the list for the frame
-            grouped_images[frame].append((wavelength, image, image_name))
-
-        # Show a warning if no image files were found
-        if not self.image_names:
-            QMessageBox.warning(
-                self, "Warning", "No image files found in the selected folder."
-            )
-            return
+            grouped_images.setdefault(frame, []).append((wavelength, image, image_name))
 
         # Prepare to store the final images and their names in the desired order
         self.images = np.empty(
