@@ -653,7 +653,7 @@ class ExtinctionUi:
                                     group_index,
                                     group_label,
                                 )
-        self.updateCurveColors()
+        self.updateCurveDashes()
 
         # Plot Maxima
         self.scatter_maxima = pg.ScatterPlotItem()
@@ -733,22 +733,38 @@ class ExtinctionUi:
 
         self.updateMaxima()
 
-    def updateCurveColors(self):
+    def updateCurveDashes(self):
+        dash_lengths = [
+            0.01,
+            1.5,
+            3.2,
+            5.2,
+            7.5,
+            10.1,
+            13.1,
+            16.6,
+            20.6,
+            25.2,
+            30.5,
+            36.6,
+            43.6,
+        ]
         if self.average_first_radio.isChecked():
             for group_index in range(self.num_groups):
                 if self.average_time_checkbox.isChecked():
                     for i, time_range in enumerate(self.time_range_indices):
+                        original_pen = self.time_average_curves[i][group_index].opts[
+                            "pen"
+                        ]
+                        pen = QPen(original_pen)
+                        pen.setWidth(4)
+                        pen.setCosmetic(True)
+                        pen.setCapStyle(Qt.RoundCap)
                         if i != 0:
-                            original_pen = self.time_average_curves[i][
-                                group_index
-                            ].opts["pen"]
-                            pen = QPen(original_pen)
-                            dash_length = 4
-                            gap_length = 1 + int(
-                                (i / (len(self.time_range_indices) - 1)) * 10
-                            )
+                            dash_length = dash_lengths[(i - 1) % len(dash_lengths)] * 2
+                            gap_length = dash_length + 4 * 2
                             pen.setDashPattern([dash_length, gap_length])
-                            self.time_average_curves[i][group_index].setPen(pen)
+                        self.time_average_curves[i][group_index].setPen(pen)
         else:
             for spot_index in range(self.num_spots):
                 if self.average_time_checkbox.isChecked():
@@ -758,10 +774,8 @@ class ExtinctionUi:
                                 "pen"
                             ]
                             pen = QPen(original_pen)
-                            dash_length = 4
-                            gap_length = 1 + int(
-                                (i / (len(self.time_range_indices) - 1)) * 10
-                            )
+                            dash_length = dash_lengths[(i - 1) % len(dash_lengths)]
+                            gap_length = dash_length + 4
                             pen.setDashPattern([dash_length, gap_length])
                             self.time_average_curves[i][spot_index].setPen(pen)
 
@@ -776,23 +790,28 @@ class ExtinctionUi:
                 (self.time_series_x >= region[0]) & (self.time_series_x <= region[1])
             )[0]
 
-    def get_diff_and_std(self):
+    def get_data_for_results_display(self):
+        # We can't use get_statistics directly since we need the statistics for individual spots
         if self.individual_metric is None:
             self.regression(average_first=False)
 
-        range1 = self.individual_metric[self.time_range_indices[0], :, 0]
-        range1_means = np.mean(range1, axis=0)
-        # Divide std by sample size to compute standard error of the mean
-        range1_std = np.std(range1, axis=0) / np.sqrt(len(range1))
-
-        range2 = self.individual_metric[self.time_range_indices[1], :, 0]
-        range2_means = np.mean(range2, axis=0)
-        range2_std = np.std(range2, axis=0) / np.sqrt(len(range2))
-
-        diff = np.abs(range2_means - range1_means)
-        diff_std = np.sqrt(range1_std * range1_std + range2_std * range2_std)
-
-        return diff, diff_std
+        diffs = []
+        diff_sems = []
+        reference_mean = None
+        reference_sem = None
+        for i, range in enumerate(self.time_range_indices):
+            values = self.individual_metric[range, :, 0]
+            mean = np.mean(values, axis=0)
+            sem = np.std(values, axis=0) / np.sqrt(len(range))
+            if i == 0:
+                reference_mean = mean
+                reference_sem = sem
+            else:
+                diff = mean - reference_mean
+                diff_sem = np.sqrt(sem**2 + reference_sem**2)
+                diffs.append(diff)
+                diff_sems.append(diff_sem)
+        return np.array(diffs), np.array(diff_sems)
 
     def get_statistics(self):
 

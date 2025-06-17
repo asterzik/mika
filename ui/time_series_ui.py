@@ -46,6 +46,11 @@ class TimeSeries:
         add_time_range_button.clicked.connect(self.add_new_time_region)
         self.spinbox_layout.addWidget(add_time_range_button)
 
+        # TODO see below where the function def is
+        # remove_time_range_button = QPushButton("Remove Last Time Range")
+        # remove_time_range_button.clicked.connect(self.remove_last_time_region)
+        # self.spinbox_layout.addWidget(remove_time_range_button)
+
         self.time_controls_group_box.setLayout(self.spinbox_layout)
 
         # Add two time ranges for comparisons
@@ -122,6 +127,15 @@ class TimeSeries:
     def add_new_time_region(self):
         self.add_time_region()
         self.addTimeRanges()
+
+    # TODO this would be a nice feature but the sidebar needs to be handled properly, the statistics view and the extinction ui need to be updated
+    # def remove_last_time_region(self):
+    #     time_range = self.time_ranges.pop()
+    #     self.widget.removeItem(time_range)
+    #     start_sb, end_sb = self.time_range_spinboxes.pop()
+    #     layout = self.time_range_sb_layouts.pop()
+    #     self.spinbox_layout.removeLayout(layout)
+    #     bool_added = self.time_ranges_added.pop()
 
     def update_spinboxes(self):
         for range, (start_sb, end_sb) in zip(
@@ -225,7 +239,7 @@ class TimeSeries:
                         sb.setRange(self.min_x, self.max_x)
                         sb.setSingleStep(1)
         self.parent.statistics_view.updateDiffColors()
-        self.parent.extinction_ui.updateCurveColors()
+        self.parent.extinction_ui.updateCurveDashes()
 
     def export_time_series_to_csv(self, filename):
         # Prepare the data

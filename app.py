@@ -234,8 +234,8 @@ class MainWindow(QMainWindow):
         detected_spots = self.spot_ui.circles.detected_circles
         selected_spots = self.spot_ui.circles.selected_spots
         spots = detected_spots[0, selected_spots]
-        diff, diff_std = self.extinction_ui.get_diff_and_std()
-        self.results_view.setData(spots, diff, diff_std)
+        diff, diff_sem = self.extinction_ui.get_data_for_results_display()
+        self.results_view.setData(spots, diff, diff_sem)
         self.results_view.draw()
         self.pipeline_stack_layout.setCurrentIndex(2)
 
