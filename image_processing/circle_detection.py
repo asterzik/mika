@@ -311,6 +311,53 @@ class Circles:
         self.max_radius = max_r
         self.detected = False
 
+    def compute_shifts(
+        self,
+        unique_wl,
+        n_frames,
+        index_frame,
+        highest_contrast_image,
+        highest_contrast_wl,
+    ):
+        downsample_factor = 4
+        h, w = highest_contrast_image.shape
+        new_size = (w // downsample_factor, h // downsample_factor)
+
+        # Precompute max intensity and ref image downsampled once
+        ref_max = np.max(highest_contrast_image)
+        ref_max = ref_max if ref_max != 0 else 1
+        ref_8bit = (highest_contrast_image / ref_max * 255).astype(np.uint8)
+        ref_small = cv2.resize(ref_8bit, new_size, interpolation=cv2.INTER_AREA)
+        ref_small = ref_small.astype(np.float32)
+
+        self.shifts = np.zeros((len(unique_wl), 2))
+
+        def compute_single_shift(wl_idx):
+            if unique_wl[wl_idx] == highest_contrast_wl:
+                return (wl_idx, (0.0, 0.0))
+
+            img = self.images[wl_idx * n_frames + index_frame]
+            img_max = max(ref_max, np.max(img))
+            img_max = img_max if img_max != 0 else 1
+            img_8bit = (img / img_max * 255).astype(np.uint8)
+            img_small = cv2.resize(img_8bit, new_size, interpolation=cv2.INTER_AREA)
+            img_small = img_small.astype(np.float32)
+
+            shift, _ = cv2.phaseCorrelate(ref_small, img_small)
+            return (
+                wl_idx,
+                (shift[0] * downsample_factor, shift[1] * downsample_factor),
+            )
+
+        # Use ThreadPoolExecutor for parallel processing
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor() as executor:
+            results = executor.map(compute_single_shift, range(len(unique_wl)))
+
+        for wl_idx, shift in results:
+            self.shifts[wl_idx] = shift
+
     def load_images(self, image_path, denoising_method="None"):
         """
         Load images and group them by frame, then sort them by wavelength.
@@ -353,9 +400,15 @@ class Circles:
             self.frames.append(frame)
             grouped_images.setdefault(frame, []).append((wavelength, image, image_name))
 
+        # Sort and store images
+        unique_wl = sorted(np.unique(self.wavelengths))
+        unique_frames = sorted(np.unique(self.frames))
+        n_wl = len(unique_wl)
+        n_frames = len(unique_frames)
+
         # Prepare to store the final images and their names in the desired order
         self.images = np.empty(
-            (len(np.unique(self.wavelengths)), len(np.unique(self.frames))),
+            (n_wl, n_frames),
             dtype=object,
         )
         self.image_names = np.empty_like(self.images)
@@ -384,17 +437,15 @@ class Circles:
         self.wavelengths.sort()
 
         # Iterate over all images for the first frame
-        unique_wl = np.unique(self.wavelengths)
-        unique_frames = np.unique(self.frames)
         highest_contrast_image = None
         highest_contrast_wl = None
         highest_contrast = 0
         # Only check for the first frame, the other frames are similar
-        index_frame = unique_frames.tolist().index(0)
+        index_frame = unique_frames.index(0)
         self.first_frame_images = []
         for wl in unique_wl:
-            index_wavelength = unique_wl.tolist().index(wl)
-            image = self.images[index_wavelength * len(unique_frames) + index_frame]
+            index_wavelength = unique_wl.index(wl)
+            image = self.images[index_wavelength * n_frames + index_frame]
             self.first_frame_images.append(image)
 
             std = np.std(image)
@@ -406,64 +457,15 @@ class Circles:
         self.input_img = highest_contrast_image
 
         # Compute pixels shifts relative to the representative image
-        self.shifts = np.zeros((len(unique_wl), 2))
+        self.compute_shifts(
+            unique_wl,
+            n_frames,
+            index_frame,
+            self.input_img,
+            unique_wl[unique_wl.index(highest_contrast_wl)],
+        )
 
-        for wl in unique_wl:
-            if wl == highest_contrast_wl:
-                continue
-            index_wavelength = unique_wl.tolist().index(wl)
-            image = self.images[index_wavelength * len(unique_frames) + index_frame]
-
-            # 2. Downsample Spatially and Convert to 8-bit (uint8)
-            # This step also handles implicit intensity scaling to 0-255 based on current data range
-            # or a global max if you prefer a fixed scaling (see notes below).
-            downsample_factor = 4  # Experiment with this value (2, 4, 8, etc.)
-
-            # It's often robust to find the max intensity *after* grayscaling but *before* downsampling
-            # to ensure consistent 8-bit conversion.
-            current_max_intensity = max(np.max(highest_contrast_image), np.max(image))
-            if current_max_intensity == 0:
-                current_max_intensity = 1  # Avoid division by zero, though a completely black image won't correlate.
-
-            # Scale to 0-255 and convert to uint8 before resizing
-            # This is where the bit-depth reduction happens.
-            ref_8bit = (highest_contrast_image / current_max_intensity * 255).astype(
-                np.uint8
-            )
-            cur_8bit = (image / current_max_intensity * 255).astype(np.uint8)
-
-            # Calculate new dimensions for spatial downsampling
-            original_h, original_w = ref_8bit.shape
-            new_w, new_h = (
-                original_w // downsample_factor,
-                original_h // downsample_factor,
-            )
-
-            # Perform spatial downsampling
-            downsampled_ref = cv2.resize(
-                ref_8bit, (new_w, new_h), interpolation=cv2.INTER_AREA
-            )
-            downsampled_cur = cv2.resize(
-                cur_8bit, (new_w, new_h), interpolation=cv2.INTER_AREA
-            )
-
-            # 3. Convert to float32 for cv2.phaseCorrelate
-            # This is the final type conversion required by the function.
-            ref_for_corr = downsampled_ref.astype(np.float32)
-            cur_for_corr = downsampled_cur.astype(np.float32)
-
-            # Compute shift
-            shift_downsampled, _ = cv2.phaseCorrelate(ref_for_corr, cur_for_corr)
-
-            # Scale the shift back up to the original resolution
-            actual_shift = (
-                shift_downsampled[0] * downsample_factor,
-                shift_downsampled[1] * downsample_factor,
-            )
-
-            self.shifts[index_wavelength] = actual_shift
-
-        num_repeats = int(len(self.frames) / len(unique_frames))
+        num_repeats = int(len(self.frames) / n_frames)
         self.frames = np.tile(unique_frames, num_repeats).tolist()
 
     def get_shift(self, wl):
