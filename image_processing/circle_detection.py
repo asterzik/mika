@@ -16,7 +16,7 @@ import re
 import time
 
 import math
-import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 
 # TODO make that changeable in the GUI
@@ -52,12 +52,24 @@ def extract_wl_frame(filename):
 def process_image(image_name, image_path):
     w, f = extract_wl_frame(image_name)
     img_path = os.path.join(image_path, image_name)
-    image_raw = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
-
-    if image_raw is None:
+    image = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+    if image is None:
         raise ValueError(f"Failed to load image: {image_name}")
 
-    image = image_raw.astype(np.float32)
+    # TODO: Could it be necessary to convert stuff?
+    # print(f"Image dtype: {image.dtype}, shape: {image.shape}")
+
+    # # Only convert if you really need a specific type:
+    # if image_raw.dtype == np.uint16:
+    #     image = image_raw  # already high precision
+    # elif image_raw.dtype == np.uint8:
+    #     image = image_raw  # already fast and small
+    # else:
+    #     image = cv2.convertScaleAbs(image_raw)  # scale + convert as needed
+
+    # Compress to uint8 to save memory
+    # image = ((image / 256).clip(0, 255)).astype(np.uint8)
+
     if image.ndim == 3:
         image = cv2.cvtColor(
             image, cv2.COLOR_BGRA2GRAY if image.shape[2] == 4 else cv2.COLOR_BGR2GRAY
@@ -97,6 +109,45 @@ def calculate_mean_intensity(
         average = np.mean(values)  # fallback
 
     return average
+
+
+# Global variable visible to all worker processes
+_shared_images = None
+
+
+def init_worker(images):
+    global _shared_images
+    _shared_images = images
+
+
+def run_compute_fore_back_ground(args):
+    return compute_fore_back_ground_indexed(*args)
+
+
+def compute_fore_back_ground_indexed(
+    index,
+    selected_circles,
+    denoising_method,
+    b_radius_inner,
+    b_radius_outer,
+    f_radius,
+    shift,
+    lower_threshold,
+    upper_threshold,
+):
+    global _shared_images
+    image = _shared_images[index]
+    return compute_fore_back_ground_per_image(
+        image,
+        selected_circles,
+        denoising_method,
+        b_radius_inner,
+        b_radius_outer,
+        f_radius,
+        shift,
+        lower_threshold,
+        upper_threshold,
+    )
 
 
 def compute_fore_back_ground_per_image(
@@ -349,9 +400,6 @@ class Circles:
                 (shift[0] * downsample_factor, shift[1] * downsample_factor),
             )
 
-        # Use ThreadPoolExecutor for parallel processing
-        from concurrent.futures import ThreadPoolExecutor
-
         with ThreadPoolExecutor() as executor:
             results = executor.map(compute_single_shift, range(len(unique_wl)))
 
@@ -388,7 +436,7 @@ class Circles:
         self.frames = []
         grouped_images = {}
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor() as executor:
             futures = list(
                 executor.map(
                     lambda img: process_image(img, image_path), self.image_names
@@ -433,34 +481,30 @@ class Circles:
 
         # Update self.image_names to reflect the new order
         self.image_names = self.image_names.flatten().tolist()
-        self.images = self.images.flatten().tolist()
         self.wavelengths.sort()
 
-        # Iterate over all images for the first frame
-        highest_contrast_image = None
-        highest_contrast_wl = None
-        highest_contrast = 0
-        # Only check for the first frame, the other frames are similar
-        index_frame = unique_frames.index(0)
-        self.first_frame_images = []
-        for wl in unique_wl:
-            index_wavelength = unique_wl.index(wl)
-            image = self.images[index_wavelength * n_frames + index_frame]
-            self.first_frame_images.append(image)
+        # Precompute index of frame 0
+        frame_index = unique_frames.index(0)
 
-            std = np.std(image)
-            if std > highest_contrast:
-                highest_contrast = std
-                highest_contrast_wl = wl
-                highest_contrast_image = image
+        # Collect first-frame images and compute standard deviations
+        first_frame_images = [
+            self.images[wl_idx, frame_index] for wl_idx in range(n_wl)
+        ]
+        stds = [np.std(img) for img in first_frame_images]
 
-        self.input_img = highest_contrast_image
+        # Find image with highest contrast
+        max_idx = np.argmax(stds)
+        self.input_img = first_frame_images[max_idx]
+        highest_contrast_wl = unique_wl[max_idx]
+        self.first_frame_images = first_frame_images
+
+        self.images = self.images.flatten().tolist()
 
         # Compute pixels shifts relative to the representative image
         self.compute_shifts(
             unique_wl,
             n_frames,
-            index_frame,
+            frame_index,
             self.input_img,
             unique_wl[unique_wl.index(highest_contrast_wl)],
         )
@@ -746,8 +790,6 @@ class Circles:
         self.parent.parent.spot_selection_changed = True
 
     def compute_extinction(self):
-
-        # Compute circles if not already detected
         if not self.detected:
             self.detected = self.compute_circles()
 
@@ -758,38 +800,47 @@ class Circles:
         self.foreground = np.zeros((n_images, n_circles))
         self.background = np.zeros((n_images, n_circles))
 
-        pool = mp.Pool(mp.cpu_count())
+        lower_threshold = (
+            self.parent.lower_threshold_param.value()
+            if self.parent.lower_threshold_enabled.isChecked()
+            else None
+        )
+        upper_threshold = (
+            self.parent.upper_threshold_param.value()
+            if self.parent.upper_threshold_enabled.isChecked()
+            else None
+        )
 
-        lower_threshold = None
-        if self.parent.lower_threshold_enabled.isChecked():
-            lower_threshold = self.parent.lower_threshold_param.value()
-        upper_threshold = None
-        if self.parent.upper_threshold_enabled.isChecked():
-            upper_threshold = self.parent.upper_threshold_param.value()
+        wavelengths = np.unique(self.wavelengths).tolist()
 
+        # Only passing indices and metadata
         mp_inputs = [
             (
-                image,
+                idx,
                 spots,
                 self.parent.parent.mean_method,
                 self.parent.background_inner_radius_param.value(),
                 self.parent.background_outer_radius_param.value(),
                 self.parent.inner_radius_param.value(),
-                self.shifts[np.unique(self.wavelengths).tolist().index(wl)],
+                self.shifts[wavelengths.index(wl)],
                 lower_threshold,
                 upper_threshold,
             )
-            for image, wl in zip(self.images, self.wavelengths, strict=True)
+            for idx, wl in enumerate(self.wavelengths)
         ]
+
         t0 = time.time()
-        with ThreadPool(processes=4) as pool:
-            results = pool.starmap(compute_fore_back_ground_per_image, mp_inputs)
-        print(f"Multiprocessing (starmap) took {time.time() - t0:.2f} seconds")
-        pool.close()
-        pool.join()
-        self.foreground, self.background = zip(*results)
-        self.foreground = np.array(self.foreground)
-        self.background = np.array(self.background)
+        with ProcessPoolExecutor(
+            max_workers=2,
+            initializer=init_worker,
+            initargs=(self.images,),
+        ) as executor:
+            results = list(executor.map(run_compute_fore_back_ground, mp_inputs))
+        print(f"Parallel extinction computation took {time.time() - t0:.2f} seconds")
+
+        for i, (fg, bg) in enumerate(results):
+            self.foreground[i] = fg
+            self.background[i] = bg
         self.parent.draw_histogram()
 
         self.extinction = -1 * np.log10(self.foreground / self.background)
