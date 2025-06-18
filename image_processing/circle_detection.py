@@ -16,42 +16,138 @@ import re
 import time
 
 import math
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 
 # TODO make that changeable in the GUI
 trim_percentage = 0.05
 
+PATTERNS = [
+    (0, re.compile(r"(\d+)_(\d+)")),  # Format 1
+    (1, re.compile(r"imageAtLED(\d+)Frame(\d+)")),  # Format 2
+    (2, re.compile(r"imLCTFatWL(\d+)Frame(\d+)")),  # Format 3
+]
 
-def calculate_mean_intensity(image, mask, denoising_method):
+
+def extract_wl_frame(filename):
+    filename, _ = filename.split(".")  # Remove file extension
+
+    for i, pattern in PATTERNS:
+        match = pattern.search(filename)
+        if match:
+            wl, frame = match.groups()
+            # Check if the files were generated with a LED device and convert LED indices to wavelengths
+            if i == 0:
+                mapping = [470, 500, 530, 590, 615, 660]
+                wl = mapping[int(wl)]
+            if i == 1:
+                mapping = [470, 500, 530, 560, 590, 615, 660]
+                wl = mapping[int(wl)]
+
+            return int(wl), int(frame)
+
+    raise ValueError(f"Pattern not implemented yet for filename: {filename}")
+
+
+def process_image(image_name, image_path):
+    w, f = extract_wl_frame(image_name)
+    img_path = os.path.join(image_path, image_name)
+    image = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+    if image is None:
+        raise ValueError(f"Failed to load image: {image_name}")
+
+    # TODO: Could it be necessary to convert stuff?
+    # print(f"Image dtype: {image.dtype}, shape: {image.shape}")
+
+    # # Only convert if you really need a specific type:
+    # if image_raw.dtype == np.uint16:
+    #     image = image_raw  # already high precision
+    # elif image_raw.dtype == np.uint8:
+    #     image = image_raw  # already fast and small
+    # else:
+    #     image = cv2.convertScaleAbs(image_raw)  # scale + convert as needed
+
+    # Compress to uint8 to save memory
+    # image = ((image / 256).clip(0, 255)).astype(np.uint8)
+
+    if image.ndim == 3:
+        image = cv2.cvtColor(
+            image, cv2.COLOR_BGRA2GRAY if image.shape[2] == 4 else cv2.COLOR_BGR2GRAY
+        )
+
+    return f, (w, image, image_name)
+
+
+def calculate_mean_intensity(
+    image, mask, denoising_method, lower_threshold, upper_threshold
+):
+    values = image[mask > 0]
+    if lower_threshold is not None and upper_threshold is not None:
+        values = values[(values > lower_threshold) & (values < upper_threshold)]
+    elif lower_threshold is not None:
+        values = values[values > lower_threshold]
+    elif upper_threshold is not None:
+        values = values[values < upper_threshold]
+    # If both are None, do not filter
+    if len(values) == 0:
+        return np.nan  # or 0, or handle as needed
+
     if denoising_method == "Mean":
-        average = cv2.mean(image, mask)[0]
+        average = np.mean(values)
+    elif denoising_method == "Median":
+        average = np.median(values)
+    elif denoising_method == "Mode":
+        average = stats.mode(values)[0]
+    elif denoising_method == "Trimmed Mean":
+        n_trim = int(len(values) * trim_percentage)
+        sorted_vals = np.sort(values)
+        trimmed = sorted_vals[n_trim:-n_trim] if n_trim > 0 else sorted_vals
+        average = np.mean(trimmed)
+    elif denoising_method == "Huber Mean":
+        average = huber(values)[0]
     else:
-        # Create an array to hold the new values, initialized to -1
-        masked_image = np.full(image.shape, -1, dtype=np.int32)
+        average = np.mean(values)  # fallback
 
-        # Set the values of pixels inside the ROI to the corresponding values from masked_image
-        masked_image[mask > 0] = image[mask > 0]
-
-        # Get all pixel values from the modified image
-        all_values = masked_image.flatten()  # Flatten all pixel values
-
-        # Filter valid values to exclude -1 and calculate median
-        valid_values = all_values[all_values != -1]  # Exclude -1 values
-
-        # Compute the median of valid pixel values within the ROI
-        if denoising_method == "Median":
-            average = np.median(
-                valid_values
-            )  # Compute median only for valid pixel values
-        elif denoising_method == "Mode":
-            average = stats.mode(valid_values)[0]
-        elif denoising_method == "Trimmed Mean":
-            n_trim = int(len(valid_values) * trim_percentage)
-            trimmed_data = np.sort(valid_values)[n_trim:-n_trim]
-            average = np.mean(trimmed_data)
-        elif denoising_method == "Huber Mean":
-            average = huber(valid_values)[0]
     return average
+
+
+# Global variable visible to all worker processes
+_shared_images = None
+
+
+def init_worker(images):
+    global _shared_images
+    _shared_images = images
+
+
+def run_compute_fore_back_ground(args):
+    return compute_fore_back_ground_indexed(*args)
+
+
+def compute_fore_back_ground_indexed(
+    index,
+    selected_circles,
+    denoising_method,
+    b_radius_inner,
+    b_radius_outer,
+    f_radius,
+    shift,
+    lower_threshold,
+    upper_threshold,
+):
+    global _shared_images
+    image = _shared_images[index]
+    return compute_fore_back_ground_per_image(
+        image,
+        selected_circles,
+        denoising_method,
+        b_radius_inner,
+        b_radius_outer,
+        f_radius,
+        shift,
+        lower_threshold,
+        upper_threshold,
+    )
 
 
 def compute_fore_back_ground_per_image(
@@ -62,6 +158,8 @@ def compute_fore_back_ground_per_image(
     b_radius_outer,
     f_radius,
     shift,
+    lower_threshold,
+    upper_threshold,
 ):
     average_foreground = []
     average_background = []
@@ -69,23 +167,76 @@ def compute_fore_back_ground_per_image(
     for pt in selected_circles:
         a, b, r = int(pt[0]), int(pt[1]), int(pt[2])
         a += int(round(shift[0]))
-        b += int(round(shift[0]))
+        b += int(round(shift[1]))
 
         # Calculate mean background intensity
-        grayscale_image = image[:, :, 0]
-        mask = np.zeros_like(grayscale_image, dtype=np.uint8)
+        mask = np.zeros_like(image, dtype=np.uint8)
         cv2.circle(mask, (a, b), int(b_radius_outer), 255, -1)
         cv2.circle(mask, (a, b), int(b_radius_inner), 0, -1)
-        background = calculate_mean_intensity(grayscale_image, mask, denoising_method)
+        background = calculate_mean_intensity(
+            image, mask, denoising_method, lower_threshold, upper_threshold
+        )
         average_background.append(background)
         # Calculate mean circle intensity
-        circle_mask = np.zeros_like(grayscale_image, dtype=np.uint8)
+        circle_mask = np.zeros_like(image, dtype=np.uint8)
         cv2.circle(circle_mask, (a, b), int(f_radius), 255, -1)
         foreground = calculate_mean_intensity(
-            grayscale_image, circle_mask, denoising_method
+            image, circle_mask, denoising_method, lower_threshold, upper_threshold
         )
         average_foreground.append(foreground)
     return np.array(average_foreground), np.array(average_background)
+
+
+def compute_fore_back_ground_pixels(
+    image,
+    selected_circles,
+    b_radius_inner,
+    b_radius_outer,
+    f_radius,
+    shift,
+    lower_threshold,
+    upper_threshold,
+):
+    foreground_pixels = []
+    background_pixels = []
+
+    for pt in selected_circles:
+        a, b, r = int(pt[0]), int(pt[1]), int(pt[2])
+        a += int(round(shift[0]))
+        b += int(round(shift[1]))
+
+        # Background mask (ring)
+        mask_bg = np.zeros_like(image, dtype=np.uint8)
+        cv2.circle(mask_bg, (a, b), int(b_radius_outer), 255, -1)
+        cv2.circle(mask_bg, (a, b), int(b_radius_inner), 0, -1)
+        background_pixels.append(image[mask_bg == 255])
+
+        # Foreground mask (inner circle)
+        mask_fg = np.zeros_like(image, dtype=np.uint8)
+        cv2.circle(mask_fg, (a, b), int(f_radius), 255, -1)
+        foreground_pixels.append(image[mask_fg == 255])
+
+    # Convert lists to numpy arrays
+    foreground_pixels = np.concatenate(foreground_pixels)
+    background_pixels = np.concatenate(background_pixels)
+    if lower_threshold is not None and upper_threshold is not None:
+        foreground_pixels = foreground_pixels[
+            (foreground_pixels > lower_threshold)
+            & (foreground_pixels < upper_threshold)
+        ]
+        background_pixels = background_pixels[
+            (background_pixels > lower_threshold)
+            & (background_pixels < upper_threshold)
+        ]
+    elif lower_threshold is not None:
+        foreground_pixels = foreground_pixels[foreground_pixels > lower_threshold]
+        background_pixels = background_pixels[background_pixels > lower_threshold]
+    elif upper_threshold is not None:
+        foreground_pixels = foreground_pixels[foreground_pixels < upper_threshold]
+        background_pixels = background_pixels[background_pixels < upper_threshold]
+    # If both are None, do not filter
+
+    return foreground_pixels, background_pixels
 
 
 class Circles:
@@ -132,15 +283,23 @@ class Circles:
         Returns:
         - None
         """
-        # Convert to grayscale
-        gray = cv2.cvtColor(self.input_img, cv2.COLOR_BGR2GRAY)
+        # gray = cv2.cvtColor(self.input_img, cv2.COLOR_BGR2GRAY)
+        image = self.input_img.copy()
+        if image.ndim == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Convert to 8-bit (normalize if needed)
+        if image.dtype != np.uint8:
+            # Normalize to 0–255 and convert to uint8
+            image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX)
+            image = image.astype(np.uint8)
 
         # # Blur the image
         # gray_blurred = cv2.blur(gray, (3, 3))
 
         # Apply Hough transform to detect circles
         detected_circles = cv2.HoughCircles(
-            gray,
+            image,
             cv2.HOUGH_GRADIENT,
             dp=self.dp,
             minDist=self.min_dist,
@@ -203,6 +362,50 @@ class Circles:
         self.max_radius = max_r
         self.detected = False
 
+    def compute_shifts(
+        self,
+        unique_wl,
+        n_frames,
+        index_frame,
+        highest_contrast_image,
+        highest_contrast_wl,
+    ):
+        downsample_factor = 4
+        h, w = highest_contrast_image.shape
+        new_size = (w // downsample_factor, h // downsample_factor)
+
+        # Precompute max intensity and ref image downsampled once
+        ref_max = np.max(highest_contrast_image)
+        ref_max = ref_max if ref_max != 0 else 1
+        ref_8bit = (highest_contrast_image / ref_max * 255).astype(np.uint8)
+        ref_small = cv2.resize(ref_8bit, new_size, interpolation=cv2.INTER_AREA)
+        ref_small = ref_small.astype(np.float32)
+
+        self.shifts = np.zeros((len(unique_wl), 2))
+
+        def compute_single_shift(wl_idx):
+            if unique_wl[wl_idx] == highest_contrast_wl:
+                return (wl_idx, (0.0, 0.0))
+
+            img = self.images[wl_idx * n_frames + index_frame]
+            img_max = max(ref_max, np.max(img))
+            img_max = img_max if img_max != 0 else 1
+            img_8bit = (img / img_max * 255).astype(np.uint8)
+            img_small = cv2.resize(img_8bit, new_size, interpolation=cv2.INTER_AREA)
+            img_small = img_small.astype(np.float32)
+
+            shift, _ = cv2.phaseCorrelate(ref_small, img_small)
+            return (
+                wl_idx,
+                (shift[0] * downsample_factor, shift[1] * downsample_factor),
+            )
+
+        with ThreadPoolExecutor() as executor:
+            results = executor.map(compute_single_shift, range(len(unique_wl)))
+
+        for wl_idx, shift in results:
+            self.shifts[wl_idx] = shift
+
     def load_images(self, image_path, denoising_method="None"):
         """
         Load images and group them by frame, then sort them by wavelength.
@@ -222,71 +425,38 @@ class Circles:
             for f in os.listdir(image_path)
             if f.endswith((".png", ".jpg", ".jpeg", ".tiff"))
         ]
-
-        # Initialize lists for wavelengths, frames, and a dictionary for grouped images
-        self.wavelengths = []
-        self.frames = []
-        grouped_images = {}
-
-        # TODO Get the pattern extraction right, when they decided on a format
-        def extract_wl_frame(filename):
-            filename, _ = filename.split(".")  # Remove file extension
-            patterns = [
-                re.compile(r"(\d+)_(\d+)"),  # Format 1
-                re.compile(r"imageAtLED(\d+)Frame(\d+)"),  # Format 2
-                re.compile(r"imLCTFatWL(\d+)Frame(\d+)"),  # Format 3
-            ]
-
-            for i, pattern in enumerate(patterns):
-                match = pattern.search(filename)
-                if match:
-                    wl, frame = match.groups()
-                    # Check if the files were generated with a LED device and convert LED indices to wavelengths
-                    if i == 0:
-                        mapping = [470, 500, 530, 590, 615, 660]
-                        wl = mapping[int(wl)]
-                    if i == 1:
-                        mapping = [470, 500, 530, 560, 590, 615, 660]
-                        wl = mapping[int(wl)]
-
-                    return int(wl), int(frame)
-
-            raise ValueError(f"Pattern not implemented yet for filename: {filename}")
-
-        # Group images by frame
-        for image_name in self.image_names:
-            w, f = extract_wl_frame(
-                image_name
-            )  # Extract wavelength and frame using regex
-            wavelength = int(w)
-            frame = int(f)
-
-            # Append wavelength and frame to respective lists
-            self.wavelengths.append(wavelength)
-            self.frames.append(frame)
-
-            # Initialize a new list for the frame if it's not already in grouped_images
-            if frame not in grouped_images:
-                grouped_images[frame] = []
-
-            # Load the grayscale image
-            image = cv2.imread(
-                os.path.join(image_path, image_name), cv2.IMREAD_GRAYSCALE
-            )
-
-            # Append the (wavelength, image, image_name) tuple to the list for the frame
-            grouped_images[frame].append((wavelength, image, image_name))
-
-        # Show a warning if no image files were found
         if not self.image_names:
             QMessageBox.warning(
                 self, "Warning", "No image files found in the selected folder."
             )
             return
 
+        # Initialize lists for wavelengths, frames, and a dictionary for grouped images
+        self.wavelengths = []
+        self.frames = []
+        grouped_images = {}
+
+        with ThreadPoolExecutor() as executor:
+            futures = list(
+                executor.map(
+                    lambda img: process_image(img, image_path), self.image_names
+                )
+            )
+
+        for frame, (wavelength, image, image_name) in futures:
+            self.wavelengths.append(wavelength)
+            self.frames.append(frame)
+            grouped_images.setdefault(frame, []).append((wavelength, image, image_name))
+
+        # Sort and store images
+        unique_wl = sorted(np.unique(self.wavelengths))
+        unique_frames = sorted(np.unique(self.frames))
+        n_wl = len(unique_wl)
+        n_frames = len(unique_frames)
+
         # Prepare to store the final images and their names in the desired order
         self.images = np.empty(
-            (len(np.unique(self.wavelengths)), len(np.unique(self.frames))),
+            (n_wl, n_frames),
             dtype=object,
         )
         self.image_names = np.empty_like(self.images)
@@ -301,67 +471,45 @@ class Circles:
             # Extract the sorted grayscale images and their names
             sorted_images = [img for _, img, _ in images_with_wavelengths]
 
-            # # Denoise the sorted images
-            # if denoising_method == "None":
             smoothed_images = sorted_images
-            # else:
-            #   smoothed_images = denoise_hsi_images(sorted_images, denoising_method)
 
-            # Convert each denoised grayscale image to RGB and append it to self.images
             for i, (wavelength, image, image_name) in enumerate(
                 images_with_wavelengths
             ):
-                grayscale_image = smoothed_images[i]
-                rgb_image = cv2.merge(
-                    [grayscale_image, grayscale_image, grayscale_image]
-                )
-                self.images[i, frame - 1] = rgb_image
+                self.images[i, frame - 1] = smoothed_images[i]
                 self.image_names[i, frame - 1] = image_name
 
         # Update self.image_names to reflect the new order
         self.image_names = self.image_names.flatten().tolist()
-        self.images = self.images.flatten().tolist()
         self.wavelengths.sort()
 
-        # Iterate over all images for the first frame
-        unique_wl = np.unique(self.wavelengths)
-        unique_frames = np.unique(self.frames)
-        highest_contrast_image = None
-        highest_contrast_wl = None
-        highest_contrast = 0
-        # Only check for the first frame, the other frames are similar
-        index_frame = unique_frames.tolist().index(0)
-        for wl in unique_wl:
-            index_wavelength = unique_wl.tolist().index(wl)
-            image = self.images[index_wavelength * len(unique_frames) + index_frame]
+        # Precompute index of frame 0
+        frame_index = unique_frames.index(0)
 
-            std = np.std(image)
-            if std > highest_contrast:
-                highest_contrast = std
-                highest_contrast_wl = wl
-                highest_contrast_image = image
+        # Collect first-frame images and compute standard deviations
+        first_frame_images = [
+            self.images[wl_idx, frame_index] for wl_idx in range(n_wl)
+        ]
+        stds = [np.std(img) for img in first_frame_images]
 
-        self.input_img = highest_contrast_image
+        # Find image with highest contrast
+        max_idx = np.argmax(stds)
+        self.input_img = first_frame_images[max_idx]
+        highest_contrast_wl = unique_wl[max_idx]
+        self.first_frame_images = first_frame_images
+
+        self.images = self.images.flatten().tolist()
 
         # Compute pixels shifts relative to the representative image
-        self.shifts = np.zeros((len(unique_wl), 2))
+        self.compute_shifts(
+            unique_wl,
+            n_frames,
+            frame_index,
+            self.input_img,
+            unique_wl[unique_wl.index(highest_contrast_wl)],
+        )
 
-        for wl in unique_wl:
-            if wl == highest_contrast_wl:
-                continue
-            index_wavelength = unique_wl.tolist().index(wl)
-            image = self.images[index_wavelength * len(unique_frames) + index_frame]
-
-            # Transform to grayscale float for phase correlate
-            ref_float = np.float32(
-                cv2.cvtColor(highest_contrast_image, cv2.COLOR_BGR2GRAY)
-            )
-            cur_float = np.float32(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY))
-
-            shift, _ = cv2.phaseCorrelate(ref_float, cur_float)
-            self.shifts[index_wavelength] = shift
-
-        num_repeats = int(len(self.frames) / len(unique_frames))
+        num_repeats = int(len(self.frames) / n_frames)
         self.frames = np.tile(unique_frames, num_repeats).tolist()
 
     def get_shift(self, wl):
@@ -382,16 +530,19 @@ class Circles:
         index_frame = unique_frames.index(frame)
         image = self.images[index_wavelength * len(unique_frames) + index_frame]
 
-        image_uint8 = image.astype(np.uint8)
+        image_uint8 = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
 
         # Convert the image to QImage
-        height, width, channels = image_uint8.shape
-        bytes_per_line = channels * width
+        height, width = image_uint8.shape
+        bytes_per_line = width
         q_image = QImage(
-            image_uint8.data, width, height, bytes_per_line, QImage.Format_RGB888
+            image_uint8.copy().data,
+            width,
+            height,
+            bytes_per_line,
+            QImage.Format_Grayscale8,
         ).rgbSwapped()
 
-        # Create QPixmap from QImage
         pixmap = QPixmap.fromImage(q_image)
         return pixmap
 
@@ -402,13 +553,62 @@ class Circles:
         Returns:
         - QPixmap: QPixmap object containing the input image.
         """
-        height, width, channels = self.input_img.shape
-        bytes_per_line = channels * width
+        display_image_uint8 = cv2.normalize(
+            self.input_img, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U
+        )
+
+        height, width = display_image_uint8.shape
+        bytes_per_line = width
+
+        # Use .copy().data to ensure QImage takes ownership of the data buffer,
+        # preventing potential issues if the original numpy array's memory is released.
         qimg = QImage(
-            self.input_img.data, width, height, bytes_per_line, QImage.Format_RGB888
-        ).rgbSwapped()
+            display_image_uint8.copy().data,
+            width,
+            height,
+            bytes_per_line,
+            QImage.Format_Grayscale8,
+        )
+
         qpixmap = QPixmap.fromImage(qimg)
         return qpixmap
+
+    def fore_background_first_time_step(self, b_radius_inner, b_radius_outer, f_radius):
+        lower_threshold = None
+        if self.parent.lower_threshold_enabled.isChecked():
+            lower_threshold = self.parent.lower_threshold_param.value()
+        upper_threshold = None
+        if self.parent.upper_threshold_enabled.isChecked():
+            upper_threshold = self.parent.upper_threshold_param.value()
+
+        foreground_list = []
+        backkground_list = []
+
+        pool = mp.Pool(mp.cpu_count())
+
+        mp_inputs = [
+            (
+                image,
+                self.detected_circles[0, self.selected_spots],
+                b_radius_inner,
+                b_radius_outer,
+                f_radius,
+                self.shifts[np.unique(self.wavelengths).tolist().index(wl)],
+                lower_threshold,
+                upper_threshold,
+            )
+            for image, wl in zip(
+                self.first_frame_images, np.unique(self.wavelengths), strict=True
+            )
+        ]
+        with ThreadPool(processes=4) as pool:
+            results = pool.starmap(compute_fore_back_ground_pixels, mp_inputs)
+        pool.close()
+        pool.join()
+        foreground, background = zip(*results)
+        foreground = np.concatenate(foreground)
+        background = np.concatenate(background)
+        return foreground, background
 
     def detected_circles(self):
         """
@@ -590,8 +790,6 @@ class Circles:
         self.parent.parent.spot_selection_changed = True
 
     def compute_extinction(self):
-
-        # Compute circles if not already detected
         if not self.detected:
             self.detected = self.compute_circles()
 
@@ -602,29 +800,47 @@ class Circles:
         self.foreground = np.zeros((n_images, n_circles))
         self.background = np.zeros((n_images, n_circles))
 
-        pool = mp.Pool(mp.cpu_count())
+        lower_threshold = (
+            self.parent.lower_threshold_param.value()
+            if self.parent.lower_threshold_enabled.isChecked()
+            else None
+        )
+        upper_threshold = (
+            self.parent.upper_threshold_param.value()
+            if self.parent.upper_threshold_enabled.isChecked()
+            else None
+        )
 
+        wavelengths = np.unique(self.wavelengths).tolist()
+
+        # Only passing indices and metadata
         mp_inputs = [
             (
-                image,
+                idx,
                 spots,
                 self.parent.parent.mean_method,
                 self.parent.background_inner_radius_param.value(),
                 self.parent.background_outer_radius_param.value(),
                 self.parent.inner_radius_param.value(),
-                self.shifts[np.unique(self.wavelengths).tolist().index(wl)],
+                self.shifts[wavelengths.index(wl)],
+                lower_threshold,
+                upper_threshold,
             )
-            for image, wl in zip(self.images, self.wavelengths, strict=True)
+            for idx, wl in enumerate(self.wavelengths)
         ]
+
         t0 = time.time()
-        with ThreadPool(processes=4) as pool:
-            results = pool.starmap(compute_fore_back_ground_per_image, mp_inputs)
-        print(f"Multiprocessing (starmap) took {time.time() - t0:.2f} seconds")
-        pool.close()
-        pool.join()
-        self.foreground, self.background = zip(*results)
-        self.foreground = np.array(self.foreground)
-        self.background = np.array(self.background)
+        with ProcessPoolExecutor(
+            max_workers=2,
+            initializer=init_worker,
+            initargs=(self.images,),
+        ) as executor:
+            results = list(executor.map(run_compute_fore_back_ground, mp_inputs))
+        print(f"Parallel extinction computation took {time.time() - t0:.2f} seconds")
+
+        for i, (fg, bg) in enumerate(results):
+            self.foreground[i] = fg
+            self.background[i] = bg
         self.parent.draw_histogram()
 
         self.extinction = -1 * np.log10(self.foreground / self.background)

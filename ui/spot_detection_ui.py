@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
     QGroupBox,
+    QCheckBox,
     QFormLayout,
     QToolBar,
     QSpacerItem,
@@ -475,31 +476,98 @@ class SpotDetectionUi:
         self.background_outer_radius_param.setSingleStep(1)
         # self.background_outer_radius_param.setRange(1.5, 2)
 
+        self.lower_threshold_enabled = QCheckBox("Enable Lower Threshold")
+        self.lower_threshold_enabled.setChecked(False)
+        self.lower_threshold_enabled.stateChanged.connect(
+            self.extinction_values_changed
+        )
+
+        self.lower_threshold_param = QSpinBox()
+        self.lower_threshold_param.setMinimum(-1)
+        self.lower_threshold_param.setMaximum(2_000_000_000)
+        self.lower_threshold_param.setValue(-1)
+        self.lower_threshold_param.setSingleStep(1)
+        self.lower_threshold_param.valueChanged.connect(self.extinction_values_changed)
+        self.lower_threshold_label = QLabel("Lower Threshold")
+
+        self.upper_threshold_enabled = QCheckBox("Enable Upper Threshold")
+        self.upper_threshold_enabled.setChecked(False)
+        self.upper_threshold_enabled.stateChanged.connect(
+            self.extinction_values_changed
+        )
+
+        self.upper_threshold_param = QSpinBox()
+        self.upper_threshold_param.setMinimum(-1)
+        self.upper_threshold_param.setMaximum(2_000_000_000)
+        self.upper_threshold_param.setValue(-1)
+        self.upper_threshold_param.setSingleStep(1)
+        self.upper_threshold_param.valueChanged.connect(self.extinction_values_changed)
+        self.upper_threshold_label = QLabel("Upper Threshold")
+
         self.update_button = QPushButton("Update")
-        self.update_button.clicked.connect(self.circles.compute_extinction)
+        self.update_button.clicked.connect(self.draw_histogram)
 
     def draw_histogram(self):
+        # Extract foreground and background data from the representative image
+        foreground_data, background_data = self.circles.fore_background_first_time_step(
+            self.background_inner_radius_param.value(),
+            self.background_outer_radius_param.value(),
+            self.inner_radius_param.value(),
+        )
         self.hist_widget.clear()
-        # Ensure foreground and background data exist
-        if self.circles.foreground is not None and self.circles.background is not None:
-            # Flatten the arrays and concatenate them
-            foreground_data = self.circles.foreground.flatten()
-            background_data = self.circles.background.flatten()
 
-            # Calculate histogram
-            y, x = np.histogram(foreground_data, bins=50)
+        # Plot foreground histogram
+        y_fg, x_fg = np.histogram(foreground_data, bins=50)
+        brush_fg = pg.mkBrush((*time_color_palette[0], 200))
+        self.hist_widget.plot(x_fg, y_fg, stepMode=True, fillLevel=0, brush=brush_fg)
 
-            brush = pg.mkBrush((*time_color_palette[0], 200))
+        # Plot background histogram
+        y_bg, x_bg = np.histogram(background_data, bins=50)
+        brush_bg = pg.mkBrush((*time_color_palette[1], 200))
+        self.hist_widget.plot(x_bg, y_bg, stepMode=True, fillLevel=0, brush=brush_bg)
 
-            # Plot the histogram
-            self.hist_widget.plot(x, y, stepMode=True, fillLevel=0, brush=brush)
+        self.hist_widget.setLabel("left", "Pixel Count")
+        self.hist_widget.setLabel("bottom", "Pixel Intensity")
 
-            y, x = np.histogram(background_data, bins=50)
+        # Remove the previous threshold region if it exists
+        if hasattr(self, "threshold_region"):
+            self.hist_widget.removeItem(self.threshold_region)
 
-            brush = pg.mkBrush((*time_color_palette[1], 200))
+        # Add a shaded region between lower and upper thresholds
+        if self.lower_threshold_param.value() == -1:
+            min_val = min(np.min(foreground_data), np.min(background_data))
+            self.lower_threshold_param.setValue(int(min_val))
+        if self.upper_threshold_param.value() == -1:
+            max_val = max(np.max(foreground_data), np.max(background_data))
+            self.upper_threshold_param.setValue(int(max_val))
+        self.threshold_region = pg.LinearRegionItem(
+            values=(
+                self.lower_threshold_param.value(),
+                self.upper_threshold_param.value(),
+            ),
+            orientation="vertical",
+        )
+        self.threshold_region.setBrush(pg.mkBrush(50, 50, 50, 50))
+        self.threshold_region.setZValue(-10)  # Make sure it sits behind plot lines
 
-            # Plot the histogram
-            self.hist_widget.plot(x, y, stepMode=True, fillLevel=0, brush=brush)
+        self.hist_widget.addItem(self.threshold_region)
+        self.threshold_region.sigRegionChanged.connect(
+            self.update_spinboxes_from_region
+        )
+
+    def update_spinboxes_from_region(self):
+        lower, upper = self.threshold_region.getRegion()
+        self.lower_threshold_param.blockSignals(True)
+        self.upper_threshold_param.blockSignals(True)
+
+        self.lower_threshold_param.setValue(int(lower))
+        self.upper_threshold_param.setValue(int(upper))
+
+        self.lower_threshold_param.blockSignals(False)
+        self.upper_threshold_param.blockSignals(False)
+
+        # Optionally call your shared update method manually
+        self.extinction_values_changed()
 
     def extinction_values_changed(self):
         self.circles.extinction_bool = False
@@ -565,6 +633,11 @@ class SpotDetectionUi:
         extinction_layout.addRow(
             self.background_outer_radius_label, self.background_outer_radius_param
         )
+        extinction_layout.addWidget(self.lower_threshold_enabled)
+        extinction_layout.addRow(self.lower_threshold_label, self.lower_threshold_param)
+        extinction_layout.addWidget(self.upper_threshold_enabled)
+        extinction_layout.addRow(self.upper_threshold_label, self.upper_threshold_param)
+
         extinction_layout.addWidget(self.update_button)
 
         extinction_boundaries_box.setLayout(extinction_layout)

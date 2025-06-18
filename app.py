@@ -34,9 +34,11 @@ import os
 # default_path = "D:\\mika\\data\\LED\\Glycerol_5_10_20_30_40\\images"
 # default_path = "C:\\Users\\VisLab\\bin\\mika\\data\\Glycerol_5_10_20_30_40\\images"
 
-default_path = (
-    "/media/sd/mika/data/LED/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
-)
+# default_path = (
+#     "/media/sd/mika/data/LED/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
+# )
+default_path = "/media/sd/mika/data/comparison/LSPRi/small_data/"
+# default_path = "/media/sd/mika/data/comparison/LSPRi/data2/"
 
 
 class MainWindow(QMainWindow):
@@ -85,9 +87,9 @@ class MainWindow(QMainWindow):
         self.spot_ui = SpotDetectionUi(self.path, self)
         self.spot_selection_ui = SpotSelectionUi(self.path, self)
         self.extinction_ui = ExtinctionUi(self)
-        self.time_series = TimeSeries(self)
         # Simulated statistics data (you would replace this with actual calculations)
         self.statistics_view = StatisticsView(self)
+        self.time_series = TimeSeries(self)
 
         self.results_view = ResultsView(self)
 
@@ -215,9 +217,10 @@ class MainWindow(QMainWindow):
         # with ProfileContext("start_analysis.prof"):
         if self.spot_ui.circles.selected_spots == []:
             self.spot_ui.circles.select_all_spots(self.spot_ui.interactive_image)
-        if self.spot_selection_changed:
+        if self.spot_selection_changed or not self.spot_ui.circles.extinction_bool:
             self.extinction_ui.computeEverything()
             self.extinction_ui.draw()
+            self.time_series.reset_added()
             self.time_series.draw()
             means, stds = self.extinction_ui.get_statistics()
             group_labels = self.extinction_ui.get_groups()
@@ -232,8 +235,8 @@ class MainWindow(QMainWindow):
         detected_spots = self.spot_ui.circles.detected_circles
         selected_spots = self.spot_ui.circles.selected_spots
         spots = detected_spots[0, selected_spots]
-        diff, diff_std = self.extinction_ui.get_diff_and_std()
-        self.results_view.setData(spots, diff, diff_std)
+        diff, diff_sem = self.extinction_ui.get_data_for_results_display()
+        self.results_view.setData(spots, diff, diff_sem)
         self.results_view.draw()
         self.pipeline_stack_layout.setCurrentIndex(2)
 

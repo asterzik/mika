@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QSpacerItem,
     QDoubleSpinBox,
     QFileDialog,
+    QComboBox,
 )
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import (
@@ -117,6 +118,9 @@ class ResultsView:
     def __init__(self, parent=None):
         self.parent = parent
         self.cmap = None
+        self.num_diffs = None
+        self.cur_diff = None
+        self.diffs_added = 0
 
         # Create the main widget and layout
         self.widget = QWidget()
@@ -166,7 +170,19 @@ class ResultsView:
         self.content_layout.addWidget(self.right_panel)
         # self.graphics_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.right_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-        self.right_panel.setFixedWidth(220)  # or any width that feels right
+        self.right_panel.setFixedWidth(220)
+
+        # Selection panel for which diff to display
+        # TODO add a dropdown list to the right_panel where the user can select for which diff the data should be displayed. self.num_diffs gives the number of diffs. the selection should be Diff 1 to Diff num_diffs. Also add a connection to a function triggered when the diff is changed.
+        self.diff_selector_label = QLabel("Select Difference to Display:")
+        self.right_panel_layout.addWidget(self.diff_selector_label)
+
+        # Create dropdown
+        self.diff_selector = QComboBox()
+        self.right_panel_layout.addWidget(self.diff_selector)
+
+        # Connect to a handler
+        self.diff_selector.currentIndexChanged.connect(self.on_diff_selection_changed)
 
         # --- Radio Buttons for Color Mode ---
         self.color_mode_group = QGroupBox("Coloring Mode")
@@ -267,6 +283,10 @@ class ResultsView:
 
         self.right_panel_layout.addStretch(1)
 
+    def on_diff_selection_changed(self, index):
+        self.cur_diff = index
+        self.draw()
+
     def onColorModeChanged(self):
         if self.abs_radio.isChecked():
             self.value = self.diff
@@ -295,7 +315,7 @@ class ResultsView:
             )
             self.ring_group.hide()
         elif self.binary_radio.isChecked():
-            self.value = (self.diff > (3 * self.diff_std))
+            self.value = self.diff > (3 * self.diff_std)
             self.lower = 0
             self.upper = 1
             self.legend.updateBounds(False, True)
@@ -323,6 +343,7 @@ class ResultsView:
 
     def setData(self, spots, diff, diff_std):
         self.spots = spots
+        self.num_diffs = len(diff)
         self.diff = diff
         self.diff_std = diff_std
         self.min = np.min(diff)
@@ -330,6 +351,10 @@ class ResultsView:
         self.lower = self.min
         self.upper = self.max
         self.value = self.diff
+        self.diff_selector.addItems(
+            [f"Diff {i + 1}" for i in range(self.diffs_added, self.num_diffs)]
+        )
+        self.diffs_added = self.num_diffs
         self.onColorMapChanged()
         self.onColorModeChanged()
 
@@ -341,7 +366,9 @@ class ResultsView:
         painter.setPen(pen)
 
         # Draw red filled circles at the spot positions
-        for spot, value, std in zip(self.spots, self.value, self.diff_std):
+        for spot, value, std in zip(
+            self.spots, self.value[self.cur_diff], self.diff_std[self.cur_diff]
+        ):
             x, y, r = spot
             # Normalize diff to [0,1] depending on min and max
             norm_value = (value - self.lower) / (self.upper - self.lower)
@@ -361,7 +388,7 @@ class ResultsView:
                     compare = std
                 elif self.mean_ring_radio.isChecked():
                     compare = np.mean(self.diff_std)
-                if (value > 3 * compare):
+                if value > 3 * compare:
                     ring_pen = QPen(Qt.black)
                     ring_pen.setWidth(2)
                     painter.setPen(ring_pen)
@@ -427,7 +454,12 @@ class ResultsView:
         with open(file_path, "w") as f:
             f.write("x" + "," + ",".join(map(str, self.spots[:, 0])) + "\n")
             f.write("y" + "," + ",".join(map(str, self.spots[:, 1])) + "\n")
-            f.write(self.getCurrentMode() + "," + ",".join(map(str, self.value)) + "\n")
+            f.write(
+                self.getCurrentMode()
+                + ","
+                + ",".join(map(str, self.value[self.cur_diff]))
+                + "\n"
+            )
 
     def getCurrentMode(self):
         if self.abs_radio.isChecked():

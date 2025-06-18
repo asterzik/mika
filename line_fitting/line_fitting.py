@@ -120,7 +120,6 @@ class Regressor:
         cross_corr = np.correlate(
             values - np.mean(values), ref - np.mean(ref), mode="full"
         )
-        print(np.max(cross_corr))
         lag = np.argmax(cross_corr) - (len(values) - 1)
 
         return lag, 0
@@ -135,7 +134,6 @@ class Regressor:
         cross_corr = np.correlate(
             values - np.mean(values), ref - np.mean(ref), mode="full"
         )
-        print(np.max(cross_corr))
         lag = np.argmax(cross_corr) - (len(values) - 1)
 
         return lag, 0
