@@ -816,7 +816,7 @@ class Circles:
         # Only passing indices and metadata
         mp_inputs = [
             (
-                idx,
+                image,
                 spots,
                 self.parent.parent.mean_method,
                 self.parent.background_inner_radius_param.value(),
@@ -826,21 +826,23 @@ class Circles:
                 lower_threshold,
                 upper_threshold,
             )
-            for idx, wl in enumerate(self.wavelengths)
+            for image, wl in zip(self.images, self.wavelengths, strict = True)
         ]
 
         t0 = time.time()
-        with ProcessPoolExecutor(
-            max_workers=2,
-            initializer=init_worker,
-            initargs=(self.images,),
-        ) as executor:
-            results = list(executor.map(run_compute_fore_back_ground, mp_inputs))
+        with ThreadPool(processes=4
+        ) as pool:
+            results = list(pool.starmap(compute_fore_back_ground_per_image, mp_inputs))
         print(f"Parallel extinction computation took {time.time() - t0:.2f} seconds")
+        pool.close()
+        pool.join()
+        self.foreground, self.background = zip(*results)
+        self.foreground = np.array(self.foreground)
+        self.background = np.array(self.background)
 
-        for i, (fg, bg) in enumerate(results):
-            self.foreground[i] = fg
-            self.background[i] = bg
+        # for i, (fg, bg) in enumerate(results):
+        #     self.foreground[i] = fg
+        #     self.background[i] = bg
         self.parent.draw_histogram()
 
         self.extinction = -1 * np.log10(self.foreground / self.background)
