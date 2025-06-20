@@ -388,12 +388,12 @@ class SpotDetectionUi:
 
         self.hough_min_radius_label = QLabel("Min Radius")
         self.hough_min_radius_param = QSpinBox()
-        self.hough_min_radius_param.setValue(8)
+        self.hough_min_radius_param.setValue(19)
         self.hough_min_radius_param.setSingleStep(1)
 
         self.hough_max_radius_label = QLabel("Max Radius")
         self.hough_max_radius_param = QSpinBox()
-        self.hough_max_radius_param.setValue(10)
+        self.hough_max_radius_param.setValue(19)
         self.hough_max_radius_param.setSingleStep(1)
 
     def createSpotPushButtons(self):
@@ -427,9 +427,9 @@ class SpotDetectionUi:
             self.hough_min_radius_param.value() + self.hough_max_radius_param.value()
         ) * 0.5
         # Update the radii for extinction calculations
-        self.background_inner_radius_param.setValue(int(spot_radius))
-        self.background_outer_radius_param.setValue(int(spot_radius * 2))
-        self.inner_radius_param.setValue(int(spot_radius * 0.5))
+        self.background_inner_radius_param.setValue(int(spot_radius) + 1)
+        self.background_outer_radius_param.setValue(int(spot_radius * 1.5))
+        self.inner_radius_param.setValue(int(spot_radius) - 1)
 
     def extinction_boundary_buttons(self):
         # Sets radii of the extinction calculations
@@ -476,7 +476,7 @@ class SpotDetectionUi:
         self.background_outer_radius_param.setSingleStep(1)
         # self.background_outer_radius_param.setRange(1.5, 2)
 
-        self.lower_threshold_enabled = QCheckBox("Enable Lower Threshold")
+        self.lower_threshold_enabled = QCheckBox("Inner Region: Enable Lower Threshold")
         self.lower_threshold_enabled.setChecked(False)
         self.lower_threshold_enabled.stateChanged.connect(
             self.extinction_values_changed
@@ -488,9 +488,9 @@ class SpotDetectionUi:
         self.lower_threshold_param.setValue(-1)
         self.lower_threshold_param.setSingleStep(1)
         self.lower_threshold_param.valueChanged.connect(self.extinction_values_changed)
-        self.lower_threshold_label = QLabel("Lower Threshold")
+        self.lower_threshold_label = QLabel("Inner Region: Lower Threshold")
 
-        self.upper_threshold_enabled = QCheckBox("Enable Upper Threshold")
+        self.upper_threshold_enabled = QCheckBox("Inner Region: Enable Upper Threshold")
         self.upper_threshold_enabled.setChecked(False)
         self.upper_threshold_enabled.stateChanged.connect(
             self.extinction_values_changed
@@ -502,7 +502,43 @@ class SpotDetectionUi:
         self.upper_threshold_param.setValue(-1)
         self.upper_threshold_param.setSingleStep(1)
         self.upper_threshold_param.valueChanged.connect(self.extinction_values_changed)
-        self.upper_threshold_label = QLabel("Upper Threshold")
+        self.upper_threshold_label = QLabel("Inner Region: Upper Threshold")
+
+        self.outer_lower_threshold_enabled = QCheckBox(
+            "Outer Region: Enable Lower Threshold"
+        )
+        self.outer_lower_threshold_enabled.setChecked(False)
+        self.outer_lower_threshold_enabled.stateChanged.connect(
+            self.extinction_values_changed
+        )
+
+        self.outer_lower_threshold_param = QSpinBox()
+        self.outer_lower_threshold_param.setMinimum(-1)
+        self.outer_lower_threshold_param.setMaximum(2_000_000_000)
+        self.outer_lower_threshold_param.setValue(-1)
+        self.outer_lower_threshold_param.setSingleStep(1)
+        self.outer_lower_threshold_param.valueChanged.connect(
+            self.extinction_values_changed
+        )
+        self.outer_lower_threshold_label = QLabel("Outer Region: Lower Threshold")
+
+        self.outer_upper_threshold_enabled = QCheckBox(
+            "Outer Region: Enable Upper Threshold"
+        )
+        self.outer_upper_threshold_enabled.setChecked(False)
+        self.outer_upper_threshold_enabled.stateChanged.connect(
+            self.extinction_values_changed
+        )
+
+        self.outer_upper_threshold_param = QSpinBox()
+        self.outer_upper_threshold_param.setMinimum(-1)
+        self.outer_upper_threshold_param.setMaximum(2_000_000_000)
+        self.outer_upper_threshold_param.setValue(-1)
+        self.outer_upper_threshold_param.setSingleStep(1)
+        self.outer_upper_threshold_param.valueChanged.connect(
+            self.extinction_values_changed
+        )
+        self.outer_upper_threshold_label = QLabel("Outer Region: Upper Threshold")
 
         self.update_button = QPushButton("Update")
         self.update_button.clicked.connect(self.draw_histogram)
@@ -535,10 +571,10 @@ class SpotDetectionUi:
 
         # Add a shaded region between lower and upper thresholds
         if self.lower_threshold_param.value() == -1:
-            min_val = min(np.min(foreground_data), np.min(background_data))
+            min_val = np.min(foreground_data)
             self.lower_threshold_param.setValue(int(min_val))
         if self.upper_threshold_param.value() == -1:
-            max_val = max(np.max(foreground_data), np.max(background_data))
+            max_val = np.max(foreground_data)
             self.upper_threshold_param.setValue(int(max_val))
         self.threshold_region = pg.LinearRegionItem(
             values=(
@@ -555,6 +591,35 @@ class SpotDetectionUi:
             self.update_spinboxes_from_region
         )
 
+        # Outer thresholds
+        # Remove the previous threshold region if it exists
+        if hasattr(self, "outer_threshold_region"):
+            self.hist_widget.removeItem(self.outer_threshold_region)
+
+        # Add a shaded region between lower and upper thresholds
+        if self.outer_lower_threshold_param.value() == -1:
+            min_val = np.min(background_data)
+            self.outer_lower_threshold_param.setValue(int(min_val))
+        if self.outer_upper_threshold_param.value() == -1:
+            max_val = np.max(background_data)
+            self.outer_upper_threshold_param.setValue(int(max_val))
+        self.outer_threshold_region = pg.LinearRegionItem(
+            values=(
+                self.outer_lower_threshold_param.value(),
+                self.outer_upper_threshold_param.value(),
+            ),
+            orientation="vertical",
+        )
+        self.outer_threshold_region.setBrush(pg.mkBrush(50, 50, 50, 50))
+        self.outer_threshold_region.setZValue(
+            -10
+        )  # Make sure it sits behind plot lines
+
+        self.hist_widget.addItem(self.outer_threshold_region)
+        self.outer_threshold_region.sigRegionChanged.connect(
+            self.update_spinboxes_from_region
+        )
+
     def update_spinboxes_from_region(self):
         lower, upper = self.threshold_region.getRegion()
         self.lower_threshold_param.blockSignals(True)
@@ -566,7 +631,16 @@ class SpotDetectionUi:
         self.lower_threshold_param.blockSignals(False)
         self.upper_threshold_param.blockSignals(False)
 
-        # Optionally call your shared update method manually
+        lower, upper = self.outer_threshold_region.getRegion()
+        self.outer_lower_threshold_param.blockSignals(True)
+        self.outer_upper_threshold_param.blockSignals(True)
+
+        self.outer_lower_threshold_param.setValue(int(lower))
+        self.outer_upper_threshold_param.setValue(int(upper))
+
+        self.outer_lower_threshold_param.blockSignals(False)
+        self.outer_upper_threshold_param.blockSignals(False)
+
         self.extinction_values_changed()
 
     def extinction_values_changed(self):
@@ -637,6 +711,15 @@ class SpotDetectionUi:
         extinction_layout.addRow(self.lower_threshold_label, self.lower_threshold_param)
         extinction_layout.addWidget(self.upper_threshold_enabled)
         extinction_layout.addRow(self.upper_threshold_label, self.upper_threshold_param)
+
+        extinction_layout.addWidget(self.outer_lower_threshold_enabled)
+        extinction_layout.addRow(
+            self.outer_lower_threshold_label, self.outer_lower_threshold_param
+        )
+        extinction_layout.addWidget(self.outer_upper_threshold_enabled)
+        extinction_layout.addRow(
+            self.outer_upper_threshold_label, self.outer_upper_threshold_param
+        )
 
         extinction_layout.addWidget(self.update_button)
 
