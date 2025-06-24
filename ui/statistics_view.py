@@ -4,6 +4,26 @@ from PySide6.QtGui import QColor
 from math import sqrt
 import numpy as np
 
+import decimal
+
+
+def format_with_aligned_decimals(val, std):
+    std_str_g = f"{std:.3g}"  # Format std to 3 significant digits first
+
+    # Determine the number of decimal places in std_str_g
+    if "." in std_str_g:
+        decimal_part = std_str_g.split(".")[1]
+        # Exclude 'e' and its following digits if scientific notation is used
+        if "e" in decimal_part:
+            decimal_part = decimal_part.split("e")[0]
+        num_decimal_places = len(decimal_part)
+    else:
+        num_decimal_places = 0
+
+    # Format val to that many decimal places (fixed-point notation)
+    val_str = f"{val:.{num_decimal_places}f}"
+    return std_str_g, val_str
+
 
 class StatisticsFrame(QFrame):
     def __init__(self, parent, group_label, group_name, means, stds):
@@ -66,9 +86,12 @@ class StatisticsFrame(QFrame):
 
     def addDiffLabel(self):
         index = len(self.diff_labels)
-        diff_label = QLabel(
-            f"<b>Diff {index + 1}:</b> {self.diff[index]:.{self.sig_digits}g}±{self.diff_std[index]:.{self.sig_digits}g}"
-        )
+        val = self.diff[index]
+        std = self.diff_std[index]
+
+        std_str, val_str = format_with_aligned_decimals(val, std)
+
+        diff_label = QLabel(f"<b>Diff {index + 1}:</b> {val_str}±{std_str}")
         self.layout.addWidget(diff_label)
         self.diff_labels.append(diff_label)
 
@@ -88,9 +111,10 @@ class StatisticsFrame(QFrame):
 
     def updateDiffLabels(self):
         for i, diff_label in enumerate(self.diff_labels):
-            diff_label.setText(
-                f"<b>Diff {i + 1}:</b> {self.diff[i]:.{self.sig_digits}g}±{self.diff_std[i]:.{self.sig_digits}g}"
+            std_str, val_str = format_with_aligned_decimals(
+                self.diff[i], self.diff_std[i]
             )
+            diff_label.setText(f"<b>Diff {i + 1}:</b> {val_str}±{std_str}")
 
     def updateDiffColors(self):
         for i, diff_label in enumerate(self.diff_labels):

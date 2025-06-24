@@ -37,7 +37,7 @@ import os
 # default_path = (
 #     "/media/sd/mika/data/LED/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
 # )
-default_path = "/media/sd/mika/data/comparison/LSPRi/small_data/"
+default_path = "/media/sd/mika/data/comparison/LSPRi/80frames/"
 # default_path = "/media/sd/mika/data/comparison/LSPRi/data2/"
 
 
