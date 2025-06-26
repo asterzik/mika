@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QSpinBox,
     QSizePolicy,
+    QDoubleSpinBox,
+    QPushButton,
 )
 from PySide6.QtGui import QColor, QPen
 from PySide6.QtCore import Qt
@@ -42,9 +44,18 @@ class RegressorType(Enum):
 max_num_time_ranges = 20
 
 
-def individualRegression(f, i, wavelengths, extinction, regressor_type, poly_degree):
+def individualRegression(
+    f, i, wavelengths, extinction, regressor_type, poly_degree, min, max
+):
     x = wavelengths[f]
     y = extinction[f, :, i]
+
+    # Create a boolean mask for wavelengths within the specified range
+    mask = (x >= min) & (x <= max)
+
+    # Apply the mask to get the data for fitting
+    x = x[mask]
+    y = y[mask]
 
     if regressor_type == RegressorType.NO_REG:
         regressor = No_Reg(x, y)
@@ -93,6 +104,10 @@ class ExtinctionUi:
         self.time_average_curves = None
         # TODO do I need to set this to None, after selected points changed?
         self.individual_metric = None
+        self.min_wavelength_data = 450
+        self.max_wavelength_data = 700
+        self.default_selected_min_wavelength = self.min_wavelength_data
+        self.default_selected_max_wavelength = self.max_wavelength_data
 
         self.regressor_selection_ui()
         self.metric_selection_ui()
@@ -154,7 +169,11 @@ class ExtinctionUi:
         self.generate_group_lists()
         if self.average_first_radio.isChecked():
             self.averageGroups()
-        self.regression(self.average_first_radio.isChecked())
+        self.regression(
+            self.average_first_radio.isChecked(),
+            self.min_wavelength_data,
+            self.max_wavelength_data,
+        )
 
     def extinction_display_options(self):
         self.extinction_display_group_box = QGroupBox("Extinction Display")
@@ -196,54 +215,103 @@ class ExtinctionUi:
         if self.average_first_radio.isChecked():
             if self.averaged_regressors is None:
                 self.averageGroups()
-                self.regression(self.average_first_radio.isChecked(), first=False)
+                self.regression(
+                    self.average_first_radio.isChecked(),
+                    self.min_wavelength_spin.value(),
+                    self.max_wavelength_spin.value(),
+                    first=False,
+                )
         else:
             if self.regressors is None:
-                self.regression(self.average_first_radio.isChecked(), first=False)
+                self.regression(
+                    self.average_first_radio.isChecked(),
+                    self.min_wavelength_spin.value(),
+                    self.max_wavelength_spin.value(),
+                    first=False,
+                )
         self.draw()
         self.parent.time_series.updateCurveData()
 
     def regressor_selection_ui(self):
-        self.reg_selection_group_box = QGroupBox("Select Regressor")
+        self.reg_selection_group_box = QGroupBox("Select Regressor & Wavelength Range")
         group_layout = QVBoxLayout()
 
+        # --- Regressor Selection ---
         self.no_reg_radio = QRadioButton(RegressorType.NO_REG.value)
         self.poly_radio = QRadioButton(RegressorType.POLY.value)
         self.gp_radio = QRadioButton(RegressorType.GP.value)
 
         self.no_reg_radio.setChecked(True)  # Default selection
 
-        # Store mapping of radio buttons to enums
         self.regressor_map = {
             self.no_reg_radio: RegressorType.NO_REG,
             self.poly_radio: RegressorType.POLY,
             self.gp_radio: RegressorType.GP,
         }
 
-        # Add spin box for polynomial degree
         self.poly_degree_spin = QSpinBox()
         self.poly_degree_spin.setValue(3)
-        self.poly_degree_spin.setEnabled(False)  # Only enable when poly is selected
+        self.poly_degree_spin.setRange(1, 10)
+        self.poly_degree_spin.setEnabled(False)
         self.poly_degree_spin.setStyleSheet("QSpinBox { color: gray; }")
-
         self.poly_degree_spin.setToolTip("Set polynomial degree.")
-
-        self.poly_degree_spin.valueChanged.connect(self.updateRegressor)
+        # self.poly_degree_spin.valueChanged.connect(self.updateRegressor) # DISCONNECTED
 
         group_layout.addWidget(self.no_reg_radio)
         poly_layout = QHBoxLayout()
         poly_layout.addWidget(self.poly_radio)
         poly_layout.addWidget(self.poly_degree_spin)
+        poly_layout.addStretch()
         group_layout.addLayout(poly_layout)
         group_layout.addWidget(self.gp_radio)
 
+        # --- Wavelength Range Selection ---
+        wavelength_group_box = QGroupBox("Wavelength Range (nm)")
+        wavelength_layout = QHBoxLayout()
+
+        min_label = QLabel("Min:")
+        self.min_wavelength_spin = QSpinBox()
+        self.min_wavelength_spin.setRange(
+            self.min_wavelength_data, self.max_wavelength_data
+        )
+        self.min_wavelength_spin.setValue(self.default_selected_min_wavelength)
+        self.min_wavelength_spin.setSuffix(" nm")
+        self.min_wavelength_spin.setToolTip("Minimum wavelength for fitting.")
+        # self.min_wavelength_spin.valueChanged.connect(self.updateWavelengthRange) # DISCONNECTED
+
+        max_label = QLabel("Max:")
+        self.max_wavelength_spin = QSpinBox()
+        self.max_wavelength_spin.setRange(
+            self.min_wavelength_data, self.max_wavelength_data
+        )
+        self.max_wavelength_spin.setValue(self.default_selected_max_wavelength)
+        self.max_wavelength_spin.setSuffix(" nm")
+        self.max_wavelength_spin.setToolTip("Maximum wavelength for fitting.")
+        # self.max_wavelength_spin.valueChanged.connect(self.updateWavelengthRange) # DISCONNECTED
+
+        wavelength_layout.addWidget(min_label)
+        wavelength_layout.addWidget(self.min_wavelength_spin)
+        wavelength_layout.addSpacing(20)
+        wavelength_layout.addWidget(max_label)
+        wavelength_layout.addWidget(self.max_wavelength_spin)
+        wavelength_layout.addStretch()
+
+        wavelength_group_box.setLayout(wavelength_layout)
+        group_layout.addWidget(wavelength_group_box)
+
+        # --- Update Button ---
+        self.update_regression_button = QPushButton("Update Regression")
+        self.update_regression_button.setToolTip(
+            "Apply selected regressor and wavelength range settings."
+        )
+        # Connect the button to the new unified update method
+        self.update_regression_button.clicked.connect(self.updateRegressor)
+
+        # Add a spacer to push the button to the bottom
+        group_layout.addStretch()
+        group_layout.addWidget(self.update_regression_button)
+
         self.reg_selection_group_box.setLayout(group_layout)
-
-        # self.button_layout.addWidget(group_box)
-
-        # Connect all buttons to the update function
-        for btn in self.regressor_map:
-            btn.clicked.connect(self.updateRegressor)
 
     def metric_selection_ui(self):
         self.metric_selection_group_box = QGroupBox("Select Metric")
@@ -318,9 +386,13 @@ class ExtinctionUi:
         self.regressors = None
         self.individual_metric = None
         gc.collect()
-        self.regression(self.average_first_radio.isChecked(), first=False)
+        min = self.min_wavelength_spin.value()
+        max = self.max_wavelength_spin.value()
+        self.regression(self.average_first_radio.isChecked(), min, max, first=False)
         self.updateCurvesData()
         self.parent.time_series.updateCurveData()
+        if self.average_time_checkbox.isChecked():
+            self.updateAverageGroups()
 
     def plot(self, time, time_label_index, spot_index, group_index, spot_label):
         if self.average_first_radio.isChecked():
@@ -458,7 +530,7 @@ class ExtinctionUi:
         # Compute the average extinction for each group
         self.average_extinction = sum_extinction_per_group / count_per_group
 
-    def regression(self, average_first, first=True):
+    def regression(self, average_first, min, max, first=True):
 
         # Select the appropriate extinction data and regressor storage
         extinction_data = self.average_extinction if average_first else self.extinction
@@ -481,6 +553,8 @@ class ExtinctionUi:
                 extinction_data,
                 selected_regressor,
                 self.poly_degree_spin.value(),
+                min,
+                max,
             )
             for frame in range(self.num_time_steps)
             for index in range(self.num_groups if average_first else self.num_spots)
