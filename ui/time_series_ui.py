@@ -177,7 +177,8 @@ class TimeSeries:
         y_values = self.y_values[self.time_indices]
         x_values = self.x_values[self.time_indices]
         for i, col in enumerate((y_values.T)):
-            self.curves[i].setData(x_values, col)
+            # TODO fix this, this needs to go till the last data point
+            self.curves[i].setData(x_values[:-1], col[:-1])
 
     def updateCurveData(self):
         self.x_values, self.y_values = self.parent.extinction_ui.get_time_series()
@@ -187,7 +188,8 @@ class TimeSeries:
             group = self.group_labels[i]
             spot_color = color_palette[group]
             pen = pg.mkPen(color=QColor(*spot_color), width=3)
-            self.curves[i].setData(x_values, col)
+            # TODO fix this, this needs to go till the last data point
+            self.curves[i].setData(x_values[:-1], col[:-1])
             self.curves[i].setVisible(True)
             self.curves[i].setPen(pen)
 
@@ -211,7 +213,8 @@ class TimeSeries:
             group = self.group_labels[i]
             spot_color = color_palette[group]
             pen = pg.mkPen(color=QColor(*spot_color), width=3)
-            line = pg.PlotDataItem(x_values, col, pen=pen, symbol=None)
+            # TODO: fix this so it goes till the last data point
+            line = pg.PlotDataItem(x_values[:-1], col[:-1], pen=pen, symbol=None)
             self.widget.addItem(line)
             self.curves[i] = line
         self.addTimeRanges()
