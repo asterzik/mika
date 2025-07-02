@@ -735,7 +735,7 @@ class SpotDetectionUi:
         self.hist_widget.setLabel("bottom", "Intensity", units="a.u.")  # X-axis
         # Create the legend
         self.legend = self.hist_widget.addLegend(
-            offset=(0, 1), brush="white", pen="lightgray", labelTextColor="black"
+            offset=(1, 1), brush="white", pen="lightgray", labelTextColor="black"
         )
 
         # Create invisible plot items for the colors
