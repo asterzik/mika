@@ -867,7 +867,11 @@ class ExtinctionUi:
     def get_data_for_results_display(self):
         # We can't use get_statistics directly since we need the statistics for individual spots
         if self.individual_metric is None:
-            self.regression(average_first=False)
+            self.regression(
+                average_first=False,
+                min=self.min_wavelength_data,
+                max=self.max_wavelength_data,
+            )
 
         diffs = []
         diff_sems = []
