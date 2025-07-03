@@ -78,6 +78,8 @@ class TimeSeries:
         start_spinbox = QSpinBox()
         end_spinbox = QSpinBox()
         start_spinbox.setValue(-1)
+        start_spinbox.setRange(-1, 1000000)
+        end_spinbox.setRange(-1, 1000000)
 
         self.time_range_spinboxes.append((start_spinbox, end_spinbox))
 
