@@ -132,7 +132,16 @@ class StatisticsFrame(QFrame):
             self.diff_line_layout.addWidget(diff_label)
             self.diff_labels.append(diff_label)
 
+        self.diff_line_layout.addStretch()  # Add stretch to push labels to the left
+        self.mean_line_layout.addStretch()  # Add stretch to push labels to the left
+
     def _clear_labels(self, label_list, layout):
+        # Iterate backwards because we'll be removing items as we go
+        for i in reversed(range(layout.count())):
+            item = layout.itemAt(i)
+            if item.spacerItem():  # This checks if it's a stretch/spacer
+                layout.removeItem(item)
+
         # Remove and delete all QLabel widgets from a list and its layout
         for label in label_list:
             if label:
@@ -219,8 +228,8 @@ class StatisticsFrame(QFrame):
                 self.mean_line_layout.removeItem(item)
 
         # Re-add stretches after clearing if they were removed
-        self.diff_line_layout.addStretch()
-        self.mean_line_layout.addStretch()
+        # self.diff_line_layout.addStretch()
+        # self.mean_line_layout.addStretch()
 
 
 class StatisticsView(QWidget):
@@ -273,7 +282,7 @@ class StatisticsView(QWidget):
             to_add = len(mean) - len(frame.means)
             frame.updateData(mean, std)
             for i in range(to_add):
-                frame.addStatisticsLabel()
+                frame.addStatisticsLabels()
             frame.updateStatisticsLabels()
 
     def getData(self):
