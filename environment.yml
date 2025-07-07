@@ -1,4 +1,4 @@
-name: mika_test_2
+name: mika
 channels:
   - conda-forge
   - defaults
