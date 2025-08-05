@@ -13,9 +13,10 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QDoubleSpinBox,
     QPushButton,
+    QGraphicsPathItem,
 )
-from PySide6.QtGui import QColor, QPen
-from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QPen, QPolygonF, QPainterPath
+from PySide6.QtCore import Qt, QPointF
 import pyqtgraph as pg
 import numpy as np
 import csv
@@ -192,9 +193,14 @@ class ExtinctionUi:
         self.maxima_checkbox.toggled.connect(self.toggle_maxima)
 
         self.average_time_checkbox = QCheckBox("Time average curves")
-        self.average_time_checkbox.setChecked(True)
+        self.average_time_checkbox.setChecked(False)
         group_layout.addWidget(self.average_time_checkbox)
         self.average_time_checkbox.toggled.connect(self.toggle_time_average)
+
+        self.time_boxplots_checkbox = QCheckBox("Time range functional boxplots")
+        self.time_boxplots_checkbox.setChecked(True)
+        group_layout.addWidget(self.time_boxplots_checkbox)
+        self.time_boxplots_checkbox.toggled.connect(self.toggle_time_average)
 
     def group_averaging_options(self):
         self.group_averaging_group_box = QGroupBox("Group Averaging")
@@ -393,6 +399,8 @@ class ExtinctionUi:
         self.parent.time_series.updateCurveData()
         if self.average_time_checkbox.isChecked():
             self.updateAverageGroups()
+        elif self.time_boxplots_checkbox.isChecked():
+            self.updateAverageGroups()
 
     def plot(self, time, time_label_index, spot_index, group_index, spot_label):
         if self.average_first_radio.isChecked():
@@ -408,7 +416,7 @@ class ExtinctionUi:
         self.plot_widget.addItem(line)
         self.curves[time][group_index] = line
 
-    def compute_average_over_time(self, time_range_indices, group_index):
+    def compute_average_over_time_box(self, time_range_indices, group_index):
         sorted_wavelengths = np.sort(self.wavelengths[time_range_indices], axis=1)
         if self.average_first_radio.isChecked():
 
@@ -430,36 +438,183 @@ class ExtinctionUi:
 
         # Compute mean values for plotting
         x_mean = np.mean(sorted_wavelengths, axis=0)
-        y_mean = np.mean(sorted_extinction, axis=0)
+        y_median = np.median(sorted_extinction, axis=0)
+        y_q1 = np.percentile(sorted_extinction, 25, axis=0)
+        y_q3 = np.percentile(sorted_extinction, 75, axis=0)
+        y_whisker_low = np.percentile(sorted_extinction, 5, axis=0)
+        y_whisker_high = np.percentile(sorted_extinction, 95, axis=0)
 
         # Select regressor based on user choice
         if self.no_reg_radio.isChecked():
-            regressor = No_Reg(x_mean, y_mean)
+            regressor_m = No_Reg(x_mean, y_median)
+            regressor_q1 = No_Reg(x_mean, y_q1)
+            regressor_q2 = No_Reg(x_mean, y_q3)
+            regressor_whisker_low = No_Reg(x_mean, y_whisker_low)
+            regressor_whisker_high = No_Reg(x_mean, y_whisker_high)
         elif self.poly_radio.isChecked():
-            regressor = Polynomial(x_mean, y_mean, self.poly_degree_spin.value())
+            regressor_m = Polynomial(x_mean, y_median, self.poly_degree_spin.value())
+            regressor_q1 = Polynomial(x_mean, y_q1)
+            regressor_q2 = Polynomial(x_mean, y_q3)
+            regressor_whisker_low = Polynomial(x_mean, y_whisker_low)
+            regressor_whisker_high = Polynomial(x_mean, y_whisker_high)
         elif self.gp_radio.isChecked():
-            regressor = GPRegression(x_mean, y_mean)
+            regressor_m = GPRegression(x_mean, y_median)
+            regressor_q1 = GPRegression(x_mean, y_q1)
+            regressor_q2 = GPRegression(x_mean, y_q3)
+            regressor_whisker_low = GPRegression(x_mean, y_whisker_low)
+            regressor_whisker_high = GPRegression(x_mean, y_whisker_high)
 
         # Fit regressor and generate plot data
-        regressor.fit()
-        return regressor.generateValues(self.num_regression_points)
+        regressor_m.fit()
+        regressor_q1.fit()
+        regressor_q2.fit()
+        regressor_whisker_low.fit()
+        regressor_whisker_high.fit()
+        return (
+            regressor_m.generateValues(self.num_regression_points),
+            regressor_q1.generateValues(self.num_regression_points),
+            regressor_q2.generateValues(self.num_regression_points),
+            regressor_whisker_low.generateValues(self.num_regression_points),
+            regressor_whisker_high.generateValues(self.num_regression_points),
+        )
 
     def plot_average_over_time(self, spot_index, group_index, spot_label):
         # Create and add plot line
         spot_color = color_palette[spot_label]
 
-        for i, time_range in enumerate(self.time_range_indices):
-            pen = pg.mkPen(color=QColor(*spot_color), width=3)
-            x_plot, y_plot = self.compute_average_over_time(time_range, spot_index)
-            line = pg.PlotDataItem(x_plot, y_plot, pen=pen, symbol=None)
-            line.setZValue(-1 * i)
-            self.plot_widget.addItem(line)
-            self.time_average_curves[i, spot_index] = line
+        if self.time_boxplots_checkbox.isChecked():
+            for i, time_range in enumerate(self.time_range_indices):
+                if self.time_average_curves_box is not None:
+                    if self.time_average_curves_box[i, group_index, 1] is not None:
+                        self.plot_widget.removeItem(
+                            self.time_average_curves_box[i, group_index, 1]
+                        )
+                    if self.time_average_curves_box[i, group_index, 2] is not None:
+                        self.plot_widget.removeItem(
+                            self.time_average_curves_box[i, group_index, 2]
+                        )
+                pen = pg.mkPen(color=QColor(*spot_color), width=3)
+                (
+                    (x_plot, y_plot),
+                    (_, y_q1_plot),
+                    (_, y_q3_plot),
+                    (_, y_whisker_low),
+                    (_, y_whisker_high),
+                ) = self.compute_average_over_time_box(time_range, spot_index)
+                line = pg.PlotDataItem(x_plot, y_plot, pen=pen, symbol=None)
+                line.setZValue(-1 * i)
+                self.plot_widget.addItem(line)
+
+                # Create fill between Q1 and Q3
+                x_full = np.concatenate([x_plot, x_plot[::-1]])
+                y_full = np.concatenate([y_q3_plot, y_q1_plot[::-1]])
+                points = [QPointF(x, y) for x, y in zip(x_full, y_full)]
+
+                poly = QPolygonF(points)
+                path = QPainterPath()
+                path.addPolygon(poly)
+
+                fill_item = QGraphicsPathItem(path)
+                fill_item.setBrush(
+                    QColor(spot_color[0], spot_color[1], spot_color[2], 80)
+                )  # 80 = transparency
+                fill_item.setPen(pg.mkPen(None))
+                fill_item.setZValue(-1 * i - 0.1)  # Slightly behind the lines
+
+                self.plot_widget.addItem(fill_item)
+                self.time_average_curves_box[i, spot_index, 1] = fill_item
+
+                # Construct whisker polygon
+                x_full_w = np.concatenate([x_plot, x_plot[::-1]])
+                y_full_w = np.concatenate([y_whisker_high, y_whisker_low[::-1]])
+                points_w = [QPointF(xi, yi) for xi, yi in zip(x_full_w, y_full_w)]
+
+                poly_w = QPolygonF(points_w)
+                path_w = QPainterPath()
+                path_w.addPolygon(poly_w)
+
+                fill_whiskers = QGraphicsPathItem(path_w)
+                fill_whiskers.setBrush(
+                    QColor(spot_color[0], spot_color[1], spot_color[2], 30)
+                )  # More transparent
+                fill_whiskers.setPen(pg.mkPen(None))
+                fill_whiskers.setZValue(-1 * i - 0.2)  # Behind the IQR
+
+                self.plot_widget.addItem(fill_whiskers)
+                self.time_average_curves_box[i, spot_index, 2] = fill_whiskers
+
+                self.time_average_curves_box[i, spot_index, 0] = line
+        else:
+            for i, time_range in enumerate(self.time_range_indices):
+                pen = pg.mkPen(color=QColor(*spot_color), width=3)
+                x_plot, y_plot = self.compute_average_over_time(time_range, spot_index)
+                line = pg.PlotDataItem(x_plot, y_plot, pen=pen, symbol=None)
+                line.setZValue(-1 * i)
+                self.plot_widget.addItem(line)
+                self.time_average_curves[i, spot_index] = line
 
     def updateAverageOverTime(self, group_index):
-        for i, time_range in enumerate(self.time_range_indices):
-            x, y = self.compute_average_over_time(time_range, group_index)
-            self.time_average_curves[i, group_index].setData(x, y)
+        if self.time_boxplots_checkbox.isChecked():
+            spot_color = color_palette[group_index]
+            for i, time_range in enumerate(self.time_range_indices):
+                (x, y), (_, y1), (_, y3), (_, y_whisker_low), (_, y_whisker_high) = (
+                    self.compute_average_over_time_box(time_range, group_index)
+                )
+                self.time_average_curves_box[i, group_index, 0].setData(x, y)
+                # self.time_average_curves_box[i, group_index, 1].setData(x, y1)
+                # self.time_average_curves_box[i, group_index, 2].setData(x, y3)
+
+                # Remove and update fill
+                old_fill = self.time_average_curves_box[i, group_index, 1]
+                if old_fill is not None:
+                    self.plot_widget.removeItem(old_fill)
+
+                # Create new fill
+                x_full = np.concatenate([x, x[::-1]])
+                y_full = np.concatenate([y3, y1[::-1]])
+                points = [QPointF(xi, yi) for xi, yi in zip(x_full, y_full)]
+
+                poly = QPolygonF(points)
+                path = QPainterPath()
+                path.addPolygon(poly)
+
+                fill_item = QGraphicsPathItem(path)
+                fill_item.setBrush(
+                    QColor(spot_color[0], spot_color[1], spot_color[2], 80)
+                )
+                fill_item.setPen(pg.mkPen(None))
+                fill_item.setZValue(-1 * i - 0.1)
+
+                self.plot_widget.addItem(fill_item)
+                self.time_average_curves_box[i, group_index, 1] = fill_item
+
+                old_whisker_fill = self.time_average_curves_box[i, group_index, 2]
+
+                if old_whisker_fill is not None:
+                    self.plot_widget.removeItem(old_whisker_fill)
+
+                # Create new whisker fill
+                x_full_w = np.concatenate([x, x[::-1]])
+                y_full_w = np.concatenate([y_whisker_high, y_whisker_low[::-1]])
+                points_w = [QPointF(xi, yi) for xi, yi in zip(x_full_w, y_full_w)]
+
+                poly_w = QPolygonF(points_w)
+                path_w = QPainterPath()
+                path_w.addPolygon(poly_w)
+
+                fill_whiskers = QGraphicsPathItem(path_w)
+                fill_whiskers.setBrush(
+                    QColor(spot_color[0], spot_color[1], spot_color[2], 30)
+                )
+                fill_whiskers.setPen(pg.mkPen(None))
+                fill_whiskers.setZValue(-1 * i - 0.2)
+
+                self.plot_widget.addItem(fill_whiskers)
+                self.time_average_curves_box[i, group_index, 2] = fill_whiskers
+        else:
+            for i, time_range in enumerate(self.time_range_indices):
+                x, y = self.compute_average_over_time(time_range, group_index)
+                self.time_average_curves[i, group_index].setData(x, y)
 
     def toggle_time_average(self):
         self.draw()
@@ -702,6 +857,25 @@ class ExtinctionUi:
                             self.plot_average_over_time(
                                 spot_index, group_index, group_label
                             )
+        elif self.time_boxplots_checkbox.isChecked():
+            if self.average_first_radio.isChecked():
+                self.updateTimeRanges()
+                self.time_average_curves_box = np.empty(
+                    (max_num_time_ranges, self.num_groups, 3), dtype=object
+                )
+                for group_index, group_label in enumerate(self.group_labels):
+                    self.plot_average_over_time(group_index, group_index, group_label)
+            else:
+                self.updateTimeRanges()
+                self.time_average_curves_box = np.empty(
+                    (max_num_time_ranges, self.num_spots, 3), dtype=object
+                )
+                for group_index, group_label in enumerate(self.group_labels):
+                    for spot_index, spot_labels in enumerate(self.selected_spot_labels):
+                        if group_label in spot_labels:
+                            self.plot_average_over_time(
+                                spot_index, group_index, group_label
+                            )
         else:
             if self.average_first_radio.isChecked():
                 for time_enum, time in enumerate(self.time_indices):
@@ -793,6 +967,8 @@ class ExtinctionUi:
             for group_index in range(self.num_groups):
                 if self.average_time_checkbox.isChecked():
                     self.updateAverageOverTime(group_index)
+                elif self.time_boxplots_checkbox.isChecked():
+                    self.updateAverageOverTime(group_index)
                 else:
                     for time_enum, time in enumerate(self.time_indices):
                         # Plot data points, polynomials, and store wavelength for maximum for every curve
@@ -800,6 +976,8 @@ class ExtinctionUi:
         else:
             for spot_index in range(self.num_spots):
                 if self.average_time_checkbox.isChecked():
+                    self.updateAverageOverTime(spot_index)
+                elif self.time_boxplots_checkbox.isChecked():
                     self.updateAverageOverTime(spot_index)
                 else:
                     for time_enum, time in enumerate(self.time_indices):
@@ -839,6 +1017,20 @@ class ExtinctionUi:
                             gap_length = dash_length + 4 * 2
                             pen.setDashPattern([dash_length, gap_length])
                         self.time_average_curves[i][group_index].setPen(pen)
+                elif self.time_boxplots_checkbox.isChecked():
+                    for i, time_range in enumerate(self.time_range_indices):
+                        original_pen = self.time_average_curves_box[i][group_index][
+                            0
+                        ].opts["pen"]
+                        pen = QPen(original_pen)
+                        pen.setWidth(4)
+                        pen.setCosmetic(True)
+                        pen.setCapStyle(Qt.RoundCap)
+                        if i != 0:
+                            dash_length = dash_lengths[(i - 1) % len(dash_lengths)] * 2
+                            gap_length = dash_length + 4 * 2
+                            pen.setDashPattern([dash_length, gap_length])
+                        self.time_average_curves_box[i][group_index][0].setPen(pen)
         else:
             for spot_index in range(self.num_spots):
                 if self.average_time_checkbox.isChecked():
@@ -847,6 +1039,17 @@ class ExtinctionUi:
                             original_pen = self.time_average_curves[i][spot_index].opts[
                                 "pen"
                             ]
+                            pen = QPen(original_pen)
+                            dash_length = dash_lengths[(i - 1) % len(dash_lengths)]
+                            gap_length = dash_length + 4
+                            pen.setDashPattern([dash_length, gap_length])
+                            self.time_average_curves[i][spot_index].setPen(pen)
+                elif self.time_boxplots_checkbox.isChecked():
+                    for i, time_range in enumerate(self.time_range_indices):
+                        if i != 0:
+                            original_pen = self.time_average_curves_box[i][spot_index][
+                                0
+                            ].opts["pen"]
                             pen = QPen(original_pen)
                             dash_length = dash_lengths[(i - 1) % len(dash_lengths)]
                             gap_length = dash_length + 4
