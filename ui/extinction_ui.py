@@ -30,6 +30,8 @@ from misc.colors import color_palette
 from misc.profiling import ProfileContext
 import multiprocessing as mp
 from multiprocessing.pool import ThreadPool
+import statsmodels.api as sm
+from scipy.special import comb
 
 from enum import Enum
 import gc
@@ -421,6 +423,15 @@ class ExtinctionUi:
         self.plot_widget.addItem(line)
         self.curves[time][group_index] = line
 
+    def depth(self, data):
+        n, p = data.shape
+        rv = np.argsort(data, axis=0)
+        rmat = np.argsort(rv, axis=0) + 1
+
+        down = rmat - 1
+        up = n - rmat
+        return ((np.sum(up * down, axis=1) / p) + n - 1) / comb(n, 2)
+
     def compute_average_over_time_box(self, time_range_indices, group_index):
         sorted_wavelengths = np.sort(self.wavelengths[time_range_indices], axis=1)
         if self.average_first_radio.isChecked():
@@ -440,49 +451,78 @@ class ExtinctionUi:
             for i, idx in enumerate(time_range_indices):
                 sort_indices = np.argsort(self.wavelengths[idx])
                 sorted_extinction[i] = self.extinction[idx, sort_indices, group_index]
+        wl = sorted_wavelengths[0]
 
-        # Compute mean values for plotting
-        x_mean = np.mean(sorted_wavelengths, axis=0)
-        y_median = np.median(sorted_extinction, axis=0)
-        y_q1 = np.percentile(sorted_extinction, 25, axis=0)
-        y_q3 = np.percentile(sorted_extinction, 75, axis=0)
-        y_whisker_low = np.percentile(sorted_extinction, 5, axis=0)
-        y_whisker_high = np.percentile(sorted_extinction, 95, axis=0)
+        # Analogous to computation in statsmodels functional boxplots
+        depth = self.depth(sorted_extinction)
+        wfactor = 1.5
+        ix_depth = np.argsort(depth)[::-1]
+        y_median = sorted_extinction[ix_depth[0], :]
+        ix_IQR = sorted_extinction.shape[0] // 2
+        y_q1 = sorted_extinction[ix_depth[0:ix_IQR], :].min(axis=0)
+        y_q3 = sorted_extinction[ix_depth[0:ix_IQR], :].max(axis=0)
 
-        # Select regressor based on user choice
-        if self.no_reg_radio.isChecked():
-            regressor_m = No_Reg(x_mean, y_median)
-            regressor_q1 = No_Reg(x_mean, y_q1)
-            regressor_q2 = No_Reg(x_mean, y_q3)
-            regressor_whisker_low = No_Reg(x_mean, y_whisker_low)
-            regressor_whisker_high = No_Reg(x_mean, y_whisker_high)
-        elif self.poly_radio.isChecked():
-            poly_degree = self.poly_degree_spin.value()
-            regressor_m = Polynomial(x_mean, y_median, poly_degree)
-            regressor_q1 = Polynomial(x_mean, y_q1, poly_degree)
-            regressor_q2 = Polynomial(x_mean, y_q3, poly_degree)
-            regressor_whisker_low = Polynomial(x_mean, y_whisker_low, poly_degree)
-            regressor_whisker_high = Polynomial(x_mean, y_whisker_high, poly_degree)
-        elif self.gp_radio.isChecked():
-            regressor_m = GPRegression(x_mean, y_median)
-            regressor_q1 = GPRegression(x_mean, y_q1)
-            regressor_q2 = GPRegression(x_mean, y_q3)
-            regressor_whisker_low = GPRegression(x_mean, y_whisker_low)
-            regressor_whisker_high = GPRegression(x_mean, y_whisker_high)
+        # Whisker computation
+        inner_median = np.median(sorted_extinction[ix_depth[0:ix_IQR], :], axis=0)
+        y_whisker_low = inner_median - (inner_median - y_q1) * wfactor
+        y_whisker_high = inner_median + (y_q3 - inner_median) * wfactor
 
-        # Fit regressor and generate plot data
-        regressor_m.fit()
-        regressor_q1.fit()
-        regressor_q2.fit()
-        regressor_whisker_low.fit()
-        regressor_whisker_high.fit()
-        return (
-            regressor_m.generateValues(self.num_regression_points),
-            regressor_q1.generateValues(self.num_regression_points),
-            regressor_q2.generateValues(self.num_regression_points),
-            regressor_whisker_low.generateValues(self.num_regression_points),
-            regressor_whisker_high.generateValues(self.num_regression_points),
-        )
+        # y_median = sorted_extinction[ix_depth[0]]
+        # # Central envelope (50%) uses first N//2 curves in ix_depth
+        # central_idx = ix_depth[: len(ix_depth) // 2]
+        # central_data = sorted_extinction[central_idx]
+        # y_q1 = np.min(central_data, axis=0)
+        # y_q3 = np.max(central_data, axis=0)
+
+        # # Whisker envelopes (non-outlying region)
+        # non_out_idx = [i for i in ix_depth if i not in ix_outliers]
+        # nonout_data = sorted_extinction[non_out_idx]
+        # y_whisker_low = np.min(nonout_data, axis=0)
+        # y_whisker_high = np.max(nonout_data, axis=0)
+        return (wl, y_median, y_q1, y_q3, y_whisker_low, y_whisker_high)
+
+        # # Compute mean values for plotting
+        # x_mean = np.mean(sorted_wavelengths, axis=0)
+        # y_median = np.median(sorted_extinction, axis=0)
+        # y_q1 = np.percentile(sorted_extinction, 25, axis=0)
+        # y_q3 = np.percentile(sorted_extinction, 75, axis=0)
+        # y_whisker_low = np.percentile(sorted_extinction, 5, axis=0)
+        # y_whisker_high = np.percentile(sorted_extinction, 95, axis=0)
+
+        # # Select regressor based on user choice
+        # if self.no_reg_radio.isChecked():
+        #     regressor_m = No_Reg(x_mean, y_median)
+        #     regressor_q1 = No_Reg(x_mean, y_q1)
+        #     regressor_q2 = No_Reg(x_mean, y_q3)
+        #     regressor_whisker_low = No_Reg(x_mean, y_whisker_low)
+        #     regressor_whisker_high = No_Reg(x_mean, y_whisker_high)
+        # elif self.poly_radio.isChecked():
+        #     poly_degree = self.poly_degree_spin.value()
+        #     regressor_m = Polynomial(x_mean, y_median, poly_degree)
+        #     regressor_q1 = Polynomial(x_mean, y_q1, poly_degree)
+        #     regressor_q2 = Polynomial(x_mean, y_q3, poly_degree)
+        #     regressor_whisker_low = Polynomial(x_mean, y_whisker_low, poly_degree)
+        #     regressor_whisker_high = Polynomial(x_mean, y_whisker_high, poly_degree)
+        # elif self.gp_radio.isChecked():
+        #     regressor_m = GPRegression(x_mean, y_median)
+        #     regressor_q1 = GPRegression(x_mean, y_q1)
+        #     regressor_q2 = GPRegression(x_mean, y_q3)
+        #     regressor_whisker_low = GPRegression(x_mean, y_whisker_low)
+        #     regressor_whisker_high = GPRegression(x_mean, y_whisker_high)
+
+        # # Fit regressor and generate plot data
+        # regressor_m.fit()
+        # regressor_q1.fit()
+        # regressor_q2.fit()
+        # regressor_whisker_low.fit()
+        # regressor_whisker_high.fit()
+        # return (
+        #     regressor_m.generateValues(self.num_regression_points),
+        #     regressor_q1.generateValues(self.num_regression_points),
+        #     regressor_q2.generateValues(self.num_regression_points),
+        #     regressor_whisker_low.generateValues(self.num_regression_points),
+        #     regressor_whisker_high.generateValues(self.num_regression_points),
+        # )
 
     def plot_average_over_time(self, spot_index, group_index, spot_label):
         # Create and add plot line
@@ -490,13 +530,9 @@ class ExtinctionUi:
 
         for i, time_range in enumerate(self.time_range_indices):
             pen = pg.mkPen(color=QColor(*spot_color), width=3)
-            (
-                (x_plot, y_plot),
-                (_, y_q1_plot),
-                (_, y_q3_plot),
-                (_, y_whisker_low),
-                (_, y_whisker_high),
-            ) = self.compute_average_over_time_box(time_range, spot_index)
+            (x_plot, y_plot, y_q1_plot, y_q3_plot, y_whisker_low, y_whisker_high) = (
+                self.compute_average_over_time_box(time_range, spot_index)
+            )
             line = pg.PlotDataItem(x_plot, y_plot, pen=pen, symbol=None)
             line.setZValue(-1 * i)
             self.plot_widget.addItem(line)
@@ -554,7 +590,7 @@ class ExtinctionUi:
 
     def updateAverageOverTime(self, group_index):
         for i, time_range in enumerate(self.time_range_indices):
-            (x, y), (_, y1), (_, y3), (_, y_whisker_low), (_, y_whisker_high) = (
+            (x, y, y1, y3, y_whisker_low, y_whisker_high) = (
                 self.compute_average_over_time_box(time_range, group_index)
             )
             self.time_average_curves_box[i, group_index, 0].setData(x, y)
