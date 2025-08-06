@@ -82,11 +82,9 @@ def calculate_mean_intensity(
     image, mask, denoising_method, lower_threshold, upper_threshold
 ):
     values = image[mask > 0]
-    if lower_threshold is not None and upper_threshold is not None:
-        values = values[(values > lower_threshold) & (values < upper_threshold)]
-    elif lower_threshold is not None:
+    if lower_threshold is not None:
         values = values[values > lower_threshold]
-    elif upper_threshold is not None:
+    if upper_threshold is not None:
         values = values[values < upper_threshold]
     # If both are None, do not filter
     if len(values) == 0:
@@ -134,6 +132,8 @@ def compute_fore_back_ground_indexed(
     shift,
     lower_threshold,
     upper_threshold,
+    outer_lower_threshold,
+    outer_upper_threshold,
 ):
     global _shared_images
     image = _shared_images[index]
@@ -147,6 +147,8 @@ def compute_fore_back_ground_indexed(
         shift,
         lower_threshold,
         upper_threshold,
+        outer_lower_threshold,
+        outer_upper_threshold,
     )
 
 
@@ -160,6 +162,8 @@ def compute_fore_back_ground_per_image(
     shift,
     lower_threshold,
     upper_threshold,
+    outer_lower_threshold,
+    outer_upper_threshold,
 ):
     average_foreground = []
     average_background = []
@@ -174,7 +178,7 @@ def compute_fore_back_ground_per_image(
         cv2.circle(mask, (a, b), int(b_radius_outer), 255, -1)
         cv2.circle(mask, (a, b), int(b_radius_inner), 0, -1)
         background = calculate_mean_intensity(
-            image, mask, denoising_method, lower_threshold, upper_threshold
+            image, mask, denoising_method, outer_lower_threshold, outer_upper_threshold
         )
         average_background.append(background)
         # Calculate mean circle intensity
@@ -196,6 +200,8 @@ def compute_fore_back_ground_pixels(
     shift,
     lower_threshold,
     upper_threshold,
+    outer_lower_threshold,
+    outer_upper_threshold,
 ):
     foreground_pixels = []
     background_pixels = []
@@ -219,22 +225,14 @@ def compute_fore_back_ground_pixels(
     # Convert lists to numpy arrays
     foreground_pixels = np.concatenate(foreground_pixels)
     background_pixels = np.concatenate(background_pixels)
-    if lower_threshold is not None and upper_threshold is not None:
-        foreground_pixels = foreground_pixels[
-            (foreground_pixels > lower_threshold)
-            & (foreground_pixels < upper_threshold)
-        ]
-        background_pixels = background_pixels[
-            (background_pixels > lower_threshold)
-            & (background_pixels < upper_threshold)
-        ]
-    elif lower_threshold is not None:
+    if lower_threshold is not None:
         foreground_pixels = foreground_pixels[foreground_pixels > lower_threshold]
-        background_pixels = background_pixels[background_pixels > lower_threshold]
-    elif upper_threshold is not None:
+    if upper_threshold is not None:
         foreground_pixels = foreground_pixels[foreground_pixels < upper_threshold]
-        background_pixels = background_pixels[background_pixels < upper_threshold]
-    # If both are None, do not filter
+    if outer_lower_threshold is not None:
+        background_pixels = background_pixels[background_pixels > outer_lower_threshold]
+    if outer_upper_threshold is not None:
+        background_pixels = background_pixels[background_pixels < outer_upper_threshold]
 
     return foreground_pixels, background_pixels
 
@@ -581,6 +579,13 @@ class Circles:
         if self.parent.upper_threshold_enabled.isChecked():
             upper_threshold = self.parent.upper_threshold_param.value()
 
+        outer_lower_threshold = None
+        if self.parent.outer_lower_threshold_enabled.isChecked():
+            outer_lower_threshold = self.parent.outer_lower_threshold_param.value()
+        outer_upper_threshold = None
+        if self.parent.outer_upper_threshold_enabled.isChecked():
+            outer_upper_threshold = self.parent.outer_upper_threshold_param.value()
+
         foreground_list = []
         backkground_list = []
 
@@ -596,6 +601,8 @@ class Circles:
                 self.shifts[np.unique(self.wavelengths).tolist().index(wl)],
                 lower_threshold,
                 upper_threshold,
+                outer_lower_threshold,
+                outer_upper_threshold,
             )
             for image, wl in zip(
                 self.first_frame_images, np.unique(self.wavelengths), strict=True
@@ -810,6 +817,16 @@ class Circles:
             if self.parent.upper_threshold_enabled.isChecked()
             else None
         )
+        outer_lower_threshold = (
+            self.parent.outer_lower_threshold_param.value()
+            if self.parent.outer_lower_threshold_enabled.isChecked()
+            else None
+        )
+        outer_upper_threshold = (
+            self.parent.outer_upper_threshold_param.value()
+            if self.parent.outer_upper_threshold_enabled.isChecked()
+            else None
+        )
 
         wavelengths = np.unique(self.wavelengths).tolist()
 
@@ -825,13 +842,14 @@ class Circles:
                 self.shifts[wavelengths.index(wl)],
                 lower_threshold,
                 upper_threshold,
+                outer_lower_threshold,
+                outer_upper_threshold,
             )
-            for image, wl in zip(self.images, self.wavelengths, strict = True)
+            for image, wl in zip(self.images, self.wavelengths, strict=True)
         ]
 
         t0 = time.time()
-        with ThreadPool(processes=4
-        ) as pool:
+        with ThreadPool(processes=4) as pool:
             results = list(pool.starmap(compute_fore_back_ground_per_image, mp_inputs))
         print(f"Parallel extinction computation took {time.time() - t0:.2f} seconds")
         pool.close()

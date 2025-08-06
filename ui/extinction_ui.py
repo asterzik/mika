@@ -11,9 +11,12 @@ from PySide6.QtWidgets import (
     QLabel,
     QSpinBox,
     QSizePolicy,
+    QDoubleSpinBox,
+    QPushButton,
+    QGraphicsPathItem,
 )
-from PySide6.QtGui import QColor, QPen
-from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QPen, QPolygonF, QPainterPath
+from PySide6.QtCore import Qt, QPointF
 import pyqtgraph as pg
 import numpy as np
 import csv
@@ -42,9 +45,18 @@ class RegressorType(Enum):
 max_num_time_ranges = 20
 
 
-def individualRegression(f, i, wavelengths, extinction, regressor_type, poly_degree):
+def individualRegression(
+    f, i, wavelengths, extinction, regressor_type, poly_degree, min, max
+):
     x = wavelengths[f]
     y = extinction[f, :, i]
+
+    # Create a boolean mask for wavelengths within the specified range
+    mask = (x >= min) & (x <= max)
+
+    # Apply the mask to get the data for fitting
+    x = x[mask]
+    y = y[mask]
 
     if regressor_type == RegressorType.NO_REG:
         regressor = No_Reg(x, y)
@@ -93,6 +105,10 @@ class ExtinctionUi:
         self.time_average_curves = None
         # TODO do I need to set this to None, after selected points changed?
         self.individual_metric = None
+        self.min_wavelength_data = 450
+        self.max_wavelength_data = 700
+        self.default_selected_min_wavelength = self.min_wavelength_data
+        self.default_selected_max_wavelength = self.max_wavelength_data
 
         self.regressor_selection_ui()
         self.metric_selection_ui()
@@ -154,7 +170,11 @@ class ExtinctionUi:
         self.generate_group_lists()
         if self.average_first_radio.isChecked():
             self.averageGroups()
-        self.regression(self.average_first_radio.isChecked())
+        self.regression(
+            self.average_first_radio.isChecked(),
+            self.min_wavelength_data,
+            self.max_wavelength_data,
+        )
 
     def extinction_display_options(self):
         self.extinction_display_group_box = QGroupBox("Extinction Display")
@@ -175,7 +195,19 @@ class ExtinctionUi:
         self.average_time_checkbox = QCheckBox("Time average curves")
         self.average_time_checkbox.setChecked(True)
         group_layout.addWidget(self.average_time_checkbox)
-        self.average_time_checkbox.toggled.connect(self.toggle_time_average)
+        self.average_time_checkbox.toggled.connect(self.update_boxplot_checkbox_state)
+
+        self.time_boxplots_checkbox = QCheckBox("Time range functional boxplots")
+        self.time_boxplots_checkbox.setChecked(False)
+        self.time_boxplots_checkbox.setEnabled(True)
+        group_layout.addWidget(self.time_boxplots_checkbox)
+        self.time_boxplots_checkbox.toggled.connect(self.toggle_time_average)
+
+    def update_boxplot_checkbox_state(self, state):
+        self.time_boxplots_checkbox.setEnabled(state)
+        if not state:
+            self.time_boxplots_checkbox.setChecked(False)
+        self.toggle_time_average()
 
     def group_averaging_options(self):
         self.group_averaging_group_box = QGroupBox("Group Averaging")
@@ -196,54 +228,103 @@ class ExtinctionUi:
         if self.average_first_radio.isChecked():
             if self.averaged_regressors is None:
                 self.averageGroups()
-                self.regression(self.average_first_radio.isChecked(), first=False)
+                self.regression(
+                    self.average_first_radio.isChecked(),
+                    self.min_wavelength_spin.value(),
+                    self.max_wavelength_spin.value(),
+                    first=False,
+                )
         else:
             if self.regressors is None:
-                self.regression(self.average_first_radio.isChecked(), first=False)
+                self.regression(
+                    self.average_first_radio.isChecked(),
+                    self.min_wavelength_spin.value(),
+                    self.max_wavelength_spin.value(),
+                    first=False,
+                )
         self.draw()
         self.parent.time_series.updateCurveData()
 
     def regressor_selection_ui(self):
-        self.reg_selection_group_box = QGroupBox("Select Regressor")
+        self.reg_selection_group_box = QGroupBox("Select Regressor & Wavelength Range")
         group_layout = QVBoxLayout()
 
+        # --- Regressor Selection ---
         self.no_reg_radio = QRadioButton(RegressorType.NO_REG.value)
         self.poly_radio = QRadioButton(RegressorType.POLY.value)
         self.gp_radio = QRadioButton(RegressorType.GP.value)
 
         self.no_reg_radio.setChecked(True)  # Default selection
 
-        # Store mapping of radio buttons to enums
         self.regressor_map = {
             self.no_reg_radio: RegressorType.NO_REG,
             self.poly_radio: RegressorType.POLY,
             self.gp_radio: RegressorType.GP,
         }
 
-        # Add spin box for polynomial degree
         self.poly_degree_spin = QSpinBox()
         self.poly_degree_spin.setValue(3)
-        self.poly_degree_spin.setEnabled(False)  # Only enable when poly is selected
+        self.poly_degree_spin.setRange(1, 10)
+        self.poly_degree_spin.setEnabled(False)
         self.poly_degree_spin.setStyleSheet("QSpinBox { color: gray; }")
-
         self.poly_degree_spin.setToolTip("Set polynomial degree.")
-
-        self.poly_degree_spin.valueChanged.connect(self.updateRegressor)
+        # self.poly_degree_spin.valueChanged.connect(self.updateRegressor) # DISCONNECTED
 
         group_layout.addWidget(self.no_reg_radio)
         poly_layout = QHBoxLayout()
         poly_layout.addWidget(self.poly_radio)
         poly_layout.addWidget(self.poly_degree_spin)
+        poly_layout.addStretch()
         group_layout.addLayout(poly_layout)
         group_layout.addWidget(self.gp_radio)
 
+        # --- Wavelength Range Selection ---
+        wavelength_group_box = QGroupBox("Wavelength Range (nm)")
+        wavelength_layout = QHBoxLayout()
+
+        min_label = QLabel("Min:")
+        self.min_wavelength_spin = QSpinBox()
+        self.min_wavelength_spin.setRange(
+            self.min_wavelength_data, self.max_wavelength_data
+        )
+        self.min_wavelength_spin.setValue(self.default_selected_min_wavelength)
+        self.min_wavelength_spin.setSuffix(" nm")
+        self.min_wavelength_spin.setToolTip("Minimum wavelength for fitting.")
+        # self.min_wavelength_spin.valueChanged.connect(self.updateWavelengthRange) # DISCONNECTED
+
+        max_label = QLabel("Max:")
+        self.max_wavelength_spin = QSpinBox()
+        self.max_wavelength_spin.setRange(
+            self.min_wavelength_data, self.max_wavelength_data
+        )
+        self.max_wavelength_spin.setValue(self.default_selected_max_wavelength)
+        self.max_wavelength_spin.setSuffix(" nm")
+        self.max_wavelength_spin.setToolTip("Maximum wavelength for fitting.")
+        # self.max_wavelength_spin.valueChanged.connect(self.updateWavelengthRange) # DISCONNECTED
+
+        wavelength_layout.addWidget(min_label)
+        wavelength_layout.addWidget(self.min_wavelength_spin)
+        wavelength_layout.addSpacing(20)
+        wavelength_layout.addWidget(max_label)
+        wavelength_layout.addWidget(self.max_wavelength_spin)
+        wavelength_layout.addStretch()
+
+        wavelength_group_box.setLayout(wavelength_layout)
+        group_layout.addWidget(wavelength_group_box)
+
+        # --- Update Button ---
+        self.update_regression_button = QPushButton("Update Regression")
+        self.update_regression_button.setToolTip(
+            "Apply selected regressor and wavelength range settings."
+        )
+        # Connect the button to the new unified update method
+        self.update_regression_button.clicked.connect(self.updateRegressor)
+
+        # Add a spacer to push the button to the bottom
+        group_layout.addStretch()
+        group_layout.addWidget(self.update_regression_button)
+
         self.reg_selection_group_box.setLayout(group_layout)
-
-        # self.button_layout.addWidget(group_box)
-
-        # Connect all buttons to the update function
-        for btn in self.regressor_map:
-            btn.clicked.connect(self.updateRegressor)
 
     def metric_selection_ui(self):
         self.metric_selection_group_box = QGroupBox("Select Metric")
@@ -318,9 +399,13 @@ class ExtinctionUi:
         self.regressors = None
         self.individual_metric = None
         gc.collect()
-        self.regression(self.average_first_radio.isChecked(), first=False)
+        min = self.min_wavelength_spin.value()
+        max = self.max_wavelength_spin.value()
+        self.regression(self.average_first_radio.isChecked(), min, max, first=False)
         self.updateCurvesData()
         self.parent.time_series.updateCurveData()
+        if self.average_time_checkbox.isChecked():
+            self.updateAverageGroups()
 
     def plot(self, time, time_label_index, spot_index, group_index, spot_label):
         if self.average_first_radio.isChecked():
@@ -336,7 +421,7 @@ class ExtinctionUi:
         self.plot_widget.addItem(line)
         self.curves[time][group_index] = line
 
-    def compute_average_over_time(self, time_range_indices, group_index):
+    def compute_average_over_time_box(self, time_range_indices, group_index):
         sorted_wavelengths = np.sort(self.wavelengths[time_range_indices], axis=1)
         if self.average_first_radio.isChecked():
 
@@ -358,19 +443,46 @@ class ExtinctionUi:
 
         # Compute mean values for plotting
         x_mean = np.mean(sorted_wavelengths, axis=0)
-        y_mean = np.mean(sorted_extinction, axis=0)
+        y_median = np.median(sorted_extinction, axis=0)
+        y_q1 = np.percentile(sorted_extinction, 25, axis=0)
+        y_q3 = np.percentile(sorted_extinction, 75, axis=0)
+        y_whisker_low = np.percentile(sorted_extinction, 5, axis=0)
+        y_whisker_high = np.percentile(sorted_extinction, 95, axis=0)
 
         # Select regressor based on user choice
         if self.no_reg_radio.isChecked():
-            regressor = No_Reg(x_mean, y_mean)
+            regressor_m = No_Reg(x_mean, y_median)
+            regressor_q1 = No_Reg(x_mean, y_q1)
+            regressor_q2 = No_Reg(x_mean, y_q3)
+            regressor_whisker_low = No_Reg(x_mean, y_whisker_low)
+            regressor_whisker_high = No_Reg(x_mean, y_whisker_high)
         elif self.poly_radio.isChecked():
-            regressor = Polynomial(x_mean, y_mean, self.poly_degree_spin.value())
+            poly_degree = self.poly_degree_spin.value()
+            regressor_m = Polynomial(x_mean, y_median, poly_degree)
+            regressor_q1 = Polynomial(x_mean, y_q1, poly_degree)
+            regressor_q2 = Polynomial(x_mean, y_q3, poly_degree)
+            regressor_whisker_low = Polynomial(x_mean, y_whisker_low, poly_degree)
+            regressor_whisker_high = Polynomial(x_mean, y_whisker_high, poly_degree)
         elif self.gp_radio.isChecked():
-            regressor = GPRegression(x_mean, y_mean)
+            regressor_m = GPRegression(x_mean, y_median)
+            regressor_q1 = GPRegression(x_mean, y_q1)
+            regressor_q2 = GPRegression(x_mean, y_q3)
+            regressor_whisker_low = GPRegression(x_mean, y_whisker_low)
+            regressor_whisker_high = GPRegression(x_mean, y_whisker_high)
 
         # Fit regressor and generate plot data
-        regressor.fit()
-        return regressor.generateValues(self.num_regression_points)
+        regressor_m.fit()
+        regressor_q1.fit()
+        regressor_q2.fit()
+        regressor_whisker_low.fit()
+        regressor_whisker_high.fit()
+        return (
+            regressor_m.generateValues(self.num_regression_points),
+            regressor_q1.generateValues(self.num_regression_points),
+            regressor_q2.generateValues(self.num_regression_points),
+            regressor_whisker_low.generateValues(self.num_regression_points),
+            regressor_whisker_high.generateValues(self.num_regression_points),
+        )
 
     def plot_average_over_time(self, spot_index, group_index, spot_label):
         # Create and add plot line
@@ -378,16 +490,126 @@ class ExtinctionUi:
 
         for i, time_range in enumerate(self.time_range_indices):
             pen = pg.mkPen(color=QColor(*spot_color), width=3)
-            x_plot, y_plot = self.compute_average_over_time(time_range, spot_index)
+            (
+                (x_plot, y_plot),
+                (_, y_q1_plot),
+                (_, y_q3_plot),
+                (_, y_whisker_low),
+                (_, y_whisker_high),
+            ) = self.compute_average_over_time_box(time_range, spot_index)
             line = pg.PlotDataItem(x_plot, y_plot, pen=pen, symbol=None)
             line.setZValue(-1 * i)
             self.plot_widget.addItem(line)
-            self.time_average_curves[i, spot_index] = line
+            self.time_average_curves_box[i, spot_index, 0] = line
+
+            # Optionally enable functional boxplots
+            if self.time_boxplots_checkbox.isChecked():
+                if self.time_average_curves_box is not None:
+                    if self.time_average_curves_box[i, group_index, 1] is not None:
+                        self.plot_widget.removeItem(
+                            self.time_average_curves_box[i, group_index, 1]
+                        )
+                    if self.time_average_curves_box[i, group_index, 2] is not None:
+                        self.plot_widget.removeItem(
+                            self.time_average_curves_box[i, group_index, 2]
+                        )
+
+                # Create fill between Q1 and Q3
+                x_full = np.concatenate([x_plot, x_plot[::-1]])
+                y_full = np.concatenate([y_q3_plot, y_q1_plot[::-1]])
+                points = [QPointF(x, y) for x, y in zip(x_full, y_full)]
+
+                poly = QPolygonF(points)
+                path = QPainterPath()
+                path.addPolygon(poly)
+
+                fill_item = QGraphicsPathItem(path)
+                fill_item.setBrush(
+                    QColor(spot_color[0], spot_color[1], spot_color[2], 80)
+                )  # 80 = transparency
+                fill_item.setPen(pg.mkPen(None))
+                fill_item.setZValue(-1 * i - 0.1)  # Slightly behind the lines
+
+                self.plot_widget.addItem(fill_item)
+                self.time_average_curves_box[i, spot_index, 1] = fill_item
+
+                # Construct whisker polygon
+                x_full_w = np.concatenate([x_plot, x_plot[::-1]])
+                y_full_w = np.concatenate([y_whisker_high, y_whisker_low[::-1]])
+                points_w = [QPointF(xi, yi) for xi, yi in zip(x_full_w, y_full_w)]
+
+                poly_w = QPolygonF(points_w)
+                path_w = QPainterPath()
+                path_w.addPolygon(poly_w)
+
+                fill_whiskers = QGraphicsPathItem(path_w)
+                fill_whiskers.setBrush(
+                    QColor(spot_color[0], spot_color[1], spot_color[2], 30)
+                )  # More transparent
+                fill_whiskers.setPen(pg.mkPen(None))
+                fill_whiskers.setZValue(-1 * i - 0.2)  # Behind the IQR
+
+                self.plot_widget.addItem(fill_whiskers)
+                self.time_average_curves_box[i, spot_index, 2] = fill_whiskers
 
     def updateAverageOverTime(self, group_index):
         for i, time_range in enumerate(self.time_range_indices):
-            x, y = self.compute_average_over_time(time_range, group_index)
-            self.time_average_curves[i, group_index].setData(x, y)
+            (x, y), (_, y1), (_, y3), (_, y_whisker_low), (_, y_whisker_high) = (
+                self.compute_average_over_time_box(time_range, group_index)
+            )
+            self.time_average_curves_box[i, group_index, 0].setData(x, y)
+
+            # More annoying update for the functional boxplots
+            if self.time_boxplots_checkbox.isChecked():
+                spot_color = color_palette[group_index]
+
+                # Remove and update fill
+                old_fill = self.time_average_curves_box[i, group_index, 1]
+                if old_fill is not None:
+                    self.plot_widget.removeItem(old_fill)
+
+                # Create new fill
+                x_full = np.concatenate([x, x[::-1]])
+                y_full = np.concatenate([y3, y1[::-1]])
+                points = [QPointF(xi, yi) for xi, yi in zip(x_full, y_full)]
+
+                poly = QPolygonF(points)
+                path = QPainterPath()
+                path.addPolygon(poly)
+
+                fill_item = QGraphicsPathItem(path)
+                fill_item.setBrush(
+                    QColor(spot_color[0], spot_color[1], spot_color[2], 80)
+                )
+                fill_item.setPen(pg.mkPen(None))
+                fill_item.setZValue(-1 * i - 0.1)
+
+                self.plot_widget.addItem(fill_item)
+                self.time_average_curves_box[i, group_index, 1] = fill_item
+
+                old_whisker_fill = self.time_average_curves_box[i, group_index, 2]
+
+                if old_whisker_fill is not None:
+                    self.plot_widget.removeItem(old_whisker_fill)
+
+                # Create new whisker fill
+                x_full_w = np.concatenate([x, x[::-1]])
+                y_full_w = np.concatenate([y_whisker_high, y_whisker_low[::-1]])
+                points_w = [QPointF(xi, yi) for xi, yi in zip(x_full_w, y_full_w)]
+
+                poly_w = QPolygonF(points_w)
+                path_w = QPainterPath()
+                path_w.addPolygon(poly_w)
+
+                fill_whiskers = QGraphicsPathItem(path_w)
+                fill_whiskers.setBrush(
+                    QColor(spot_color[0], spot_color[1], spot_color[2], 30)
+                )
+                fill_whiskers.setPen(pg.mkPen(None))
+                fill_whiskers.setZValue(-1 * i - 0.2)
+
+                self.plot_widget.addItem(fill_whiskers)
+                self.time_average_curves_box[i, group_index, 2] = fill_whiskers
 
     def toggle_time_average(self):
         self.draw()
@@ -458,7 +680,7 @@ class ExtinctionUi:
         # Compute the average extinction for each group
         self.average_extinction = sum_extinction_per_group / count_per_group
 
-    def regression(self, average_first, first=True):
+    def regression(self, average_first, min, max, first=True):
 
         # Select the appropriate extinction data and regressor storage
         extinction_data = self.average_extinction if average_first else self.extinction
@@ -481,6 +703,8 @@ class ExtinctionUi:
                 extinction_data,
                 selected_regressor,
                 self.poly_degree_spin.value(),
+                min,
+                max,
             )
             for frame in range(self.num_time_steps)
             for index in range(self.num_groups if average_first else self.num_spots)
@@ -612,15 +836,15 @@ class ExtinctionUi:
         if self.average_time_checkbox.isChecked():
             if self.average_first_radio.isChecked():
                 self.updateTimeRanges()
-                self.time_average_curves = np.empty(
-                    (max_num_time_ranges, self.num_groups), dtype=object
+                self.time_average_curves_box = np.empty(
+                    (max_num_time_ranges, self.num_groups, 3), dtype=object
                 )
                 for group_index, group_label in enumerate(self.group_labels):
                     self.plot_average_over_time(group_index, group_index, group_label)
             else:
                 self.updateTimeRanges()
-                self.time_average_curves = np.empty(
-                    (max_num_time_ranges, self.num_spots), dtype=object
+                self.time_average_curves_box = np.empty(
+                    (max_num_time_ranges, self.num_spots, 3), dtype=object
                 )
                 for group_index, group_label in enumerate(self.group_labels):
                     for spot_index, spot_labels in enumerate(self.selected_spot_labels):
@@ -753,9 +977,9 @@ class ExtinctionUi:
             for group_index in range(self.num_groups):
                 if self.average_time_checkbox.isChecked():
                     for i, time_range in enumerate(self.time_range_indices):
-                        original_pen = self.time_average_curves[i][group_index].opts[
-                            "pen"
-                        ]
+                        original_pen = self.time_average_curves_box[i][group_index][
+                            0
+                        ].opts["pen"]
                         pen = QPen(original_pen)
                         pen.setWidth(4)
                         pen.setCosmetic(True)
@@ -764,20 +988,20 @@ class ExtinctionUi:
                             dash_length = dash_lengths[(i - 1) % len(dash_lengths)] * 2
                             gap_length = dash_length + 4 * 2
                             pen.setDashPattern([dash_length, gap_length])
-                        self.time_average_curves[i][group_index].setPen(pen)
+                        self.time_average_curves_box[i][group_index][0].setPen(pen)
         else:
             for spot_index in range(self.num_spots):
                 if self.average_time_checkbox.isChecked():
                     for i, time_range in enumerate(self.time_range_indices):
                         if i != 0:
-                            original_pen = self.time_average_curves[i][spot_index].opts[
-                                "pen"
-                            ]
+                            original_pen = self.time_average_curves_box[i][spot_index][
+                                0
+                            ].opts["pen"]
                             pen = QPen(original_pen)
                             dash_length = dash_lengths[(i - 1) % len(dash_lengths)]
                             gap_length = dash_length + 4
                             pen.setDashPattern([dash_length, gap_length])
-                            self.time_average_curves[i][spot_index].setPen(pen)
+                            self.time_average_curves_box[i][spot_index][0].setPen(pen)
 
     def get_time_series(self):
         return self.time_series_x, self.time_series_y
@@ -793,7 +1017,11 @@ class ExtinctionUi:
     def get_data_for_results_display(self):
         # We can't use get_statistics directly since we need the statistics for individual spots
         if self.individual_metric is None:
-            self.regression(average_first=False)
+            self.regression(
+                average_first=False,
+                min=self.min_wavelength_data,
+                max=self.max_wavelength_data,
+            )
 
         diffs = []
         diff_sems = []

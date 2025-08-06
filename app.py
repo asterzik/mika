@@ -4,6 +4,16 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 import sys
 import random
 
+import os
+
+# import platform
+
+
+# # Set preferred Qt platform plugin only on Linux, and only if not already set.
+
+# if platform.system() == "Linux" and "QT_QPA_PLATFORM" not in os.environ:
+#     os.environ["QT_QPA_PLATFORM"] = "wayland;xcb"
+
 from PySide6.QtWidgets import (
     QFileDialog,
     QApplication,
@@ -29,15 +39,14 @@ from ui.statistics_view import StatisticsView
 from ui.results_view import ResultsView
 from misc.profiling import ProfileContext
 import gc
-import os
 
 # default_path = "D:\\mika\\data\\LED\\Glycerol_5_10_20_30_40\\images"
 # default_path = "C:\\Users\\VisLab\\bin\\mika\\data\\Glycerol_5_10_20_30_40\\images"
 
-# default_path = (
-#     "/media/sd/mika/data/LED/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
-# )
-default_path = "/media/sd/mika/data/comparison/LSPRi/small_data/"
+default_path = (
+    "/media/sd/mika/data/LED/Calibration_water_5xSSC_6LEDs/cropped/20_timesteps"
+)
+# default_path = "/media/sd/mika/data/comparison/LSPRi/80frames/"
 # default_path = "/media/sd/mika/data/comparison/LSPRi/data2/"
 
 
