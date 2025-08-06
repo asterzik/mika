@@ -193,14 +193,21 @@ class ExtinctionUi:
         self.maxima_checkbox.toggled.connect(self.toggle_maxima)
 
         self.average_time_checkbox = QCheckBox("Time average curves")
-        self.average_time_checkbox.setChecked(False)
+        self.average_time_checkbox.setChecked(True)
         group_layout.addWidget(self.average_time_checkbox)
-        self.average_time_checkbox.toggled.connect(self.toggle_time_average)
+        self.average_time_checkbox.toggled.connect(self.update_boxplot_checkbox_state)
 
         self.time_boxplots_checkbox = QCheckBox("Time range functional boxplots")
-        self.time_boxplots_checkbox.setChecked(True)
+        self.time_boxplots_checkbox.setChecked(False)
+        self.time_boxplots_checkbox.setEnabled(True)
         group_layout.addWidget(self.time_boxplots_checkbox)
         self.time_boxplots_checkbox.toggled.connect(self.toggle_time_average)
+
+    def update_boxplot_checkbox_state(self, state):
+        self.time_boxplots_checkbox.setEnabled(state)
+        if not state:
+            self.time_boxplots_checkbox.setChecked(False)
+        self.toggle_time_average()
 
     def group_averaging_options(self):
         self.group_averaging_group_box = QGroupBox("Group Averaging")
@@ -399,8 +406,6 @@ class ExtinctionUi:
         self.parent.time_series.updateCurveData()
         if self.average_time_checkbox.isChecked():
             self.updateAverageGroups()
-        elif self.time_boxplots_checkbox.isChecked():
-            self.updateAverageGroups()
 
     def plot(self, time, time_label_index, spot_index, group_index, spot_label):
         if self.average_first_radio.isChecked():
@@ -452,11 +457,12 @@ class ExtinctionUi:
             regressor_whisker_low = No_Reg(x_mean, y_whisker_low)
             regressor_whisker_high = No_Reg(x_mean, y_whisker_high)
         elif self.poly_radio.isChecked():
-            regressor_m = Polynomial(x_mean, y_median, self.poly_degree_spin.value())
-            regressor_q1 = Polynomial(x_mean, y_q1)
-            regressor_q2 = Polynomial(x_mean, y_q3)
-            regressor_whisker_low = Polynomial(x_mean, y_whisker_low)
-            regressor_whisker_high = Polynomial(x_mean, y_whisker_high)
+            poly_degree = self.poly_degree_spin.value()
+            regressor_m = Polynomial(x_mean, y_median, poly_degree)
+            regressor_q1 = Polynomial(x_mean, y_q1, poly_degree)
+            regressor_q2 = Polynomial(x_mean, y_q3, poly_degree)
+            regressor_whisker_low = Polynomial(x_mean, y_whisker_low, poly_degree)
+            regressor_whisker_high = Polynomial(x_mean, y_whisker_high, poly_degree)
         elif self.gp_radio.isChecked():
             regressor_m = GPRegression(x_mean, y_median)
             regressor_q1 = GPRegression(x_mean, y_q1)
@@ -482,8 +488,22 @@ class ExtinctionUi:
         # Create and add plot line
         spot_color = color_palette[spot_label]
 
-        if self.time_boxplots_checkbox.isChecked():
-            for i, time_range in enumerate(self.time_range_indices):
+        for i, time_range in enumerate(self.time_range_indices):
+            pen = pg.mkPen(color=QColor(*spot_color), width=3)
+            (
+                (x_plot, y_plot),
+                (_, y_q1_plot),
+                (_, y_q3_plot),
+                (_, y_whisker_low),
+                (_, y_whisker_high),
+            ) = self.compute_average_over_time_box(time_range, spot_index)
+            line = pg.PlotDataItem(x_plot, y_plot, pen=pen, symbol=None)
+            line.setZValue(-1 * i)
+            self.plot_widget.addItem(line)
+            self.time_average_curves_box[i, spot_index, 0] = line
+
+            # Optionally enable functional boxplots
+            if self.time_boxplots_checkbox.isChecked():
                 if self.time_average_curves_box is not None:
                     if self.time_average_curves_box[i, group_index, 1] is not None:
                         self.plot_widget.removeItem(
@@ -493,17 +513,6 @@ class ExtinctionUi:
                         self.plot_widget.removeItem(
                             self.time_average_curves_box[i, group_index, 2]
                         )
-                pen = pg.mkPen(color=QColor(*spot_color), width=3)
-                (
-                    (x_plot, y_plot),
-                    (_, y_q1_plot),
-                    (_, y_q3_plot),
-                    (_, y_whisker_low),
-                    (_, y_whisker_high),
-                ) = self.compute_average_over_time_box(time_range, spot_index)
-                line = pg.PlotDataItem(x_plot, y_plot, pen=pen, symbol=None)
-                line.setZValue(-1 * i)
-                self.plot_widget.addItem(line)
 
                 # Create fill between Q1 and Q3
                 x_full = np.concatenate([x_plot, x_plot[::-1]])
@@ -543,26 +552,16 @@ class ExtinctionUi:
                 self.plot_widget.addItem(fill_whiskers)
                 self.time_average_curves_box[i, spot_index, 2] = fill_whiskers
 
-                self.time_average_curves_box[i, spot_index, 0] = line
-        else:
-            for i, time_range in enumerate(self.time_range_indices):
-                pen = pg.mkPen(color=QColor(*spot_color), width=3)
-                x_plot, y_plot = self.compute_average_over_time(time_range, spot_index)
-                line = pg.PlotDataItem(x_plot, y_plot, pen=pen, symbol=None)
-                line.setZValue(-1 * i)
-                self.plot_widget.addItem(line)
-                self.time_average_curves[i, spot_index] = line
-
     def updateAverageOverTime(self, group_index):
-        if self.time_boxplots_checkbox.isChecked():
-            spot_color = color_palette[group_index]
-            for i, time_range in enumerate(self.time_range_indices):
-                (x, y), (_, y1), (_, y3), (_, y_whisker_low), (_, y_whisker_high) = (
-                    self.compute_average_over_time_box(time_range, group_index)
-                )
-                self.time_average_curves_box[i, group_index, 0].setData(x, y)
-                # self.time_average_curves_box[i, group_index, 1].setData(x, y1)
-                # self.time_average_curves_box[i, group_index, 2].setData(x, y3)
+        for i, time_range in enumerate(self.time_range_indices):
+            (x, y), (_, y1), (_, y3), (_, y_whisker_low), (_, y_whisker_high) = (
+                self.compute_average_over_time_box(time_range, group_index)
+            )
+            self.time_average_curves_box[i, group_index, 0].setData(x, y)
+
+            # More annoying update for the functional boxplots
+            if self.time_boxplots_checkbox.isChecked():
+                spot_color = color_palette[group_index]
 
                 # Remove and update fill
                 old_fill = self.time_average_curves_box[i, group_index, 1]
@@ -611,10 +610,6 @@ class ExtinctionUi:
 
                 self.plot_widget.addItem(fill_whiskers)
                 self.time_average_curves_box[i, group_index, 2] = fill_whiskers
-        else:
-            for i, time_range in enumerate(self.time_range_indices):
-                x, y = self.compute_average_over_time(time_range, group_index)
-                self.time_average_curves[i, group_index].setData(x, y)
 
     def toggle_time_average(self):
         self.draw()
@@ -841,25 +836,6 @@ class ExtinctionUi:
         if self.average_time_checkbox.isChecked():
             if self.average_first_radio.isChecked():
                 self.updateTimeRanges()
-                self.time_average_curves = np.empty(
-                    (max_num_time_ranges, self.num_groups), dtype=object
-                )
-                for group_index, group_label in enumerate(self.group_labels):
-                    self.plot_average_over_time(group_index, group_index, group_label)
-            else:
-                self.updateTimeRanges()
-                self.time_average_curves = np.empty(
-                    (max_num_time_ranges, self.num_spots), dtype=object
-                )
-                for group_index, group_label in enumerate(self.group_labels):
-                    for spot_index, spot_labels in enumerate(self.selected_spot_labels):
-                        if group_label in spot_labels:
-                            self.plot_average_over_time(
-                                spot_index, group_index, group_label
-                            )
-        elif self.time_boxplots_checkbox.isChecked():
-            if self.average_first_radio.isChecked():
-                self.updateTimeRanges()
                 self.time_average_curves_box = np.empty(
                     (max_num_time_ranges, self.num_groups, 3), dtype=object
                 )
@@ -967,8 +943,6 @@ class ExtinctionUi:
             for group_index in range(self.num_groups):
                 if self.average_time_checkbox.isChecked():
                     self.updateAverageOverTime(group_index)
-                elif self.time_boxplots_checkbox.isChecked():
-                    self.updateAverageOverTime(group_index)
                 else:
                     for time_enum, time in enumerate(self.time_indices):
                         # Plot data points, polynomials, and store wavelength for maximum for every curve
@@ -976,8 +950,6 @@ class ExtinctionUi:
         else:
             for spot_index in range(self.num_spots):
                 if self.average_time_checkbox.isChecked():
-                    self.updateAverageOverTime(spot_index)
-                elif self.time_boxplots_checkbox.isChecked():
                     self.updateAverageOverTime(spot_index)
                 else:
                     for time_enum, time in enumerate(self.time_indices):
@@ -1005,20 +977,6 @@ class ExtinctionUi:
             for group_index in range(self.num_groups):
                 if self.average_time_checkbox.isChecked():
                     for i, time_range in enumerate(self.time_range_indices):
-                        original_pen = self.time_average_curves[i][group_index].opts[
-                            "pen"
-                        ]
-                        pen = QPen(original_pen)
-                        pen.setWidth(4)
-                        pen.setCosmetic(True)
-                        pen.setCapStyle(Qt.RoundCap)
-                        if i != 0:
-                            dash_length = dash_lengths[(i - 1) % len(dash_lengths)] * 2
-                            gap_length = dash_length + 4 * 2
-                            pen.setDashPattern([dash_length, gap_length])
-                        self.time_average_curves[i][group_index].setPen(pen)
-                elif self.time_boxplots_checkbox.isChecked():
-                    for i, time_range in enumerate(self.time_range_indices):
                         original_pen = self.time_average_curves_box[i][group_index][
                             0
                         ].opts["pen"]
@@ -1036,17 +994,6 @@ class ExtinctionUi:
                 if self.average_time_checkbox.isChecked():
                     for i, time_range in enumerate(self.time_range_indices):
                         if i != 0:
-                            original_pen = self.time_average_curves[i][spot_index].opts[
-                                "pen"
-                            ]
-                            pen = QPen(original_pen)
-                            dash_length = dash_lengths[(i - 1) % len(dash_lengths)]
-                            gap_length = dash_length + 4
-                            pen.setDashPattern([dash_length, gap_length])
-                            self.time_average_curves[i][spot_index].setPen(pen)
-                elif self.time_boxplots_checkbox.isChecked():
-                    for i, time_range in enumerate(self.time_range_indices):
-                        if i != 0:
                             original_pen = self.time_average_curves_box[i][spot_index][
                                 0
                             ].opts["pen"]
@@ -1054,7 +1001,7 @@ class ExtinctionUi:
                             dash_length = dash_lengths[(i - 1) % len(dash_lengths)]
                             gap_length = dash_length + 4
                             pen.setDashPattern([dash_length, gap_length])
-                            self.time_average_curves[i][spot_index].setPen(pen)
+                            self.time_average_curves_box[i][spot_index][0].setPen(pen)
 
     def get_time_series(self):
         return self.time_series_x, self.time_series_y
