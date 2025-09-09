@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the following paper."
+authors:
+  - family-names: Sterzik
+    given-names: Anna
+title: "LSPRi Analysis Framework"
+version: "1.0.0"
+date-released: 2025
+
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Sterzik
+      given-names: Anna
+      orcid: "https://orcid.org/0000-0002-0544-5397"
+    - family-names: Lednický
+      given-names: Tomáš
+    - family-names: Csáki
+      given-names: Andrea
+    - family-names: Lawonn
+      given-names: Kai
+  title: "A visualization framework for localized surface plasmon resonance imaging in sensing applications"
+  journal: "Computers & Graphics"
+  year: 2025
+  doi: 10.1016/j.cag.2025.104396
+
+
