@@ -28,7 +28,7 @@ This project is described in our paper:
 
 ### 1. Setting Up the Environment
 
-1. Install Miniconda or Anaconda if you don’t have it already and activate it with
+1. Install conda e.g. using miniforge if you don’t have it already and activate it with
    ```bash
    conda activate
    ```
