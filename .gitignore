@@ -11,3 +11,4 @@ build
 app.spec
 dist
 dist.zip
+!representative_image_test_data_spot_detection_view.png
