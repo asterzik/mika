@@ -71,3 +71,27 @@ Look for `CUDA: YES` in the output.
 - The wavelengths and frames are extracted from the image names. The pattern matching is done in the function `load_images` in `image_processing/circle_detection.py`.
 - If you want, you can set a `default_path` to an image folder that gets opened automatically upon startup in `app.py`, but this is not necessary.
 - It's only possible to assign `n` groups with `n = number of spots * 2`. This is currently hardcoded. If more groups are necessary, this can be changed.
+
+## Replicability
+This repository is configured to demonstrate the core functionality presented in the paper. To keep the repository lightweight, we provide a **Test Dataset** (`test_data/`) for demonstration purposes.
+
+### Target: Figure 4
+The provided script launches the application with the demonstration data. By following the interactive steps, you can generate a result that verifies the functionality shown in **Figure 4** of the paper.
+
+*   **Note:** As this dataset is used for demonstration, the output will differ  to the full-scale result in the paper (less timesteps, less spots), but the algorithmic behavior is identical.
+*   **Reference Output:** You can view the expected result for this specific test run here: [replicability.png](.assets/replicability.png)
+
+### Instructions to Replicate
+
+**1. Run the Automation Script**
+We provide a single script that installs all system dependencies, sets up the environment, and automatically launches the application with the demonstration data. It requires no parameters.
+
+```bash
+bash install_and_run.sh
+```
+
+**2. Perform Interaction**
+Since this application is interactive, specific mouse inputs are required to process the data.
+- Please watch the short video guide to see the required steps [replicability.mp4](.assets/replicability.mp4)
+
+
