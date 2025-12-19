@@ -75,7 +75,6 @@ Look for `CUDA: YES` in the output.
 ## Replicability
 This repository is configured to demonstrate the core functionality presented in the paper. To keep the repository lightweight, we provide a **Test Dataset** (`test_data/`) for demonstration purposes.
 
-### Target: Figure 4
 The provided script launches the application with the demonstration data. By following the interactive steps, you can generate a result that verifies the functionality shown in **Figure 4** of the paper.
 
 *   **Note:** As this dataset is used for demonstration, the output will differ  to the full-scale result in the paper (less timesteps, less spots), but the algorithmic behavior is identical.
@@ -83,15 +82,12 @@ The provided script launches the application with the demonstration data. By fol
 
 ### Instructions to Replicate
 
-**1. Run the Automation Script**
-We provide a single script that installs all system dependencies, sets up the environment, and automatically launches the application with the demonstration data. It requires no parameters.
+* We provide a single script that installs all system dependencies, sets up the environment, and automatically launches the application with the demonstration data. It requires no parameters.
 
 ```bash
 bash install_and_run.sh
 ```
 
-**2. Perform Interaction**
-Since this application is interactive, specific mouse inputs are required to process the data.
-- Please watch the short video guide to see the required steps [replicability.mp4](.assets/replicability.mp4)
+* Since this application is interactive, specific mouse inputs are required to process the data. Please watch the short video guide to see the required steps [replicability.mp4](.assets/replicability.mp4)
 
 
