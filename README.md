@@ -88,6 +88,9 @@ The provided script launches the application with the demonstration data. By fol
 bash install_and_run.sh
 ```
 
-* Since this application is interactive, specific mouse inputs are required to process the data. Please watch the short video guide to see the required steps [replicability.mp4](.assets/replicability.mp4)
+* Since this application is interactive, specific mouse inputs are required to process the data. Please watch the short video guide to see the required steps:
+
+https://github.com/user-attachments/assets/6a1adda2-d51f-4a79-a111-2a8a73f59229
+
 
 
